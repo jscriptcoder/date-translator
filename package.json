@@ -1,0 +1,41 @@
+{
+  "name": "date-translator",
+  "version": "1.0.0",
+  "description": "Using Neural Machine Translation with Attention to build a date translator",
+  "main": "src/jsx/index.jsx",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jscriptcoder/date-translator.git"
+  },
+  "keywords": [
+    "react",
+    "machinelearning",
+    "rnn",
+    "lstm"
+  ],
+  "author": "Francisco Ramos <jscriptcoder@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jscriptcoder/date-translator/issues"
+  },
+  "homepage": "https://github.com/jscriptcoder/date-translator#readme",
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-core": "^6.26.3",
+    "babel-loader": "^8.0.2",
+    "babel-preset-env": "^1.7.0",
+    "babel-preset-react": "^6.24.1",
+    "css-loader": "^1.0.0",
+    "style-loader": "^0.23.0",
+    "webpack": "^4.18.1",
+    "webpack-cli": "^3.1.0",
+    "webpack-dev-server": "^3.1.8"
+  },
+  "dependencies": {
+    "react": "^16.5.1",
+    "react-dom": "^16.5.1"
+  }
+}
