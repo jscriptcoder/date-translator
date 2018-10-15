@@ -7,7 +7,7 @@
     "build:prod": "browserify src/DateTranslator.jsx -o lib/index.js -u react -t [ babelify ]",
     "build:css": "node-sass src/index.scss example/style.css",
     "copy:html": "cp src/index.html example/",
-    "copy-model:example": "cp -R tfjsmodel example/tfjsmodel",
+    "copy-model:example": "cp -R tfjsmodel example",
     "prebuild:example": "npm run build:css && npm run copy:html",
     "build:example": "browserify --extension=.jsx src/index.jsx -o example/script.js -t [ babelify ]",
     "preexample": "npm run copy-model:example",
@@ -38,14 +38,14 @@
     "babel-preset-env": "^1.7.0",
     "babel-preset-react": "^6.24.1",
     "babelify": "^8.0.0",
-    "browserify": "^16.2.2",
+    "browserify": "^16.2.3",
     "live-server": "^1.2.0",
-    "node-sass": "^4.9.3",
+    "node-sass": "^4.9.4",
     "watch": "^1.0.2"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "^0.13.1",
-    "react": "^16.5.1",
-    "react-dom": "^16.5.1"
+    "@tensorflow/tfjs": "^0.13.2",
+    "react": "^16.5.2",
+    "react-dom": "^16.5.2"
   }
 }

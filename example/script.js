@@ -2509,7 +2509,7 @@ $root.tensorflow = (function() {
 
 module.exports = $root;
 
-},{"protobufjs/minimal":573}],9:[function(require,module,exports){
+},{"protobufjs/minimal":585}],9:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ExecutionContext = (function () {
@@ -4121,6 +4121,11 @@ exports.executeOp = function (node, tensorMap, context) {
         case 'argMin': {
             var axis = utils_1.getParamValue('axis', node, tensorMap, context);
             return [tfc.argMin(utils_1.getParamValue('x', node, tensorMap, context), axis)];
+        }
+        case 'prod': {
+            var axis = utils_1.getParamValue('axis', node, tensorMap, context);
+            var keepDims = utils_1.getParamValue('keepDims', node, tensorMap, context);
+            return [tfc.prod(utils_1.getParamValue('x', node, tensorMap, context), axis, keepDims)];
         }
         default:
             throw TypeError("Node type " + node.op + " is not implemented");
@@ -6151,6 +6156,19 @@ exports.json = [
             { 'tfInputIndex': 0, 'dlParamName': 'x', 'type': 'tensor' },
             { 'tfInputIndex': 1, 'dlParamName': 'axis', 'type': 'number' }
         ]
+    },
+    {
+        'tfOpName': 'Prod',
+        'dlOpName': 'prod',
+        'category': 'reduction',
+        'params': [
+            { 'tfInputIndex': 0, 'dlParamName': 'x', 'type': 'tensor' },
+            { 'tfInputIndex': 1, 'dlParamName': 'axis', 'type': 'number[]' }, {
+                'tfParamName': 'keep_dims',
+                'dlParamName': 'keepDims',
+                'type': 'bool'
+            }
+        ]
     }
 ];
 
@@ -6763,7 +6781,7 @@ exports.OperationMapper = OperationMapper;
 },{"../data/compiled_api":8,"./executors/utils":29,"./op_list/arithmetic":30,"./op_list/basic_math":31,"./op_list/control":32,"./op_list/convolution":33,"./op_list/creation":34,"./op_list/dynamic":35,"./op_list/evaluation":36,"./op_list/graph":37,"./op_list/image":38,"./op_list/logical":39,"./op_list/matrices":40,"./op_list/normalization":41,"./op_list/reduction":42,"./op_list/slice_join":43,"./op_list/transformation":44}],47:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var version = '0.6.1';
+var version = '0.6.4';
 exports.version = version;
 
 },{}],48:[function(require,module,exports){
@@ -6779,7 +6797,7 @@ function nextFrame() {
 exports.nextFrame = nextFrame;
 
 }).call(this,require("timers").setImmediate)
-},{"timers":604}],49:[function(require,module,exports){
+},{"timers":616}],49:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 function isMobile() {
@@ -7222,7 +7240,7 @@ function ones(shape) {
     return tensor_1.Tensor.make(shape, { values: values });
 }
 
-},{"./profiler":175,"./tape":177,"./tensor":178,"./tensor_util":180,"./util":185}],51:[function(require,module,exports){
+},{"./profiler":184,"./tape":186,"./tensor":187,"./tensor_util":189,"./util":194}],51:[function(require,module,exports){
 (function (process){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -7324,8 +7342,14 @@ var Environment = (function () {
         else if (feature === 'IS_CHROME') {
             return environment_util_1.isChrome();
         }
+        else if (feature === 'WEBGL_CONV_IM2COL') {
+            return false;
+        }
         else if (feature === 'WEBGL_PAGING_ENABLED') {
-            return this.get('IS_BROWSER');
+            return this.get('IS_BROWSER') && !this.get('PROD');
+        }
+        else if (feature === 'WEBGL_MAX_TEXTURE_SIZE') {
+            return environment_util_1.getWebGLMaxTextureSize(this.get('WEBGL_VERSION'), this.get('IS_BROWSER'));
         }
         else if (feature === 'IS_TEST') {
             return false;
@@ -7365,6 +7389,10 @@ var Environment = (function () {
         else if (feature === 'WEBGL_FENCE_API_ENABLED') {
             return environment_util_1.isWebGLFenceEnabled(this.get('WEBGL_VERSION'), this.get('IS_BROWSER'));
         }
+        else if (feature === 'WEBGL_SIZE_UPLOAD_UNIFORM') {
+            var useUniforms = this.get('WEBGL_RENDER_FLOAT32_ENABLED');
+            return useUniforms ? 4 : 0;
+        }
         else if (feature === 'TEST_EPSILON') {
             return this.backend.floatPrecision() === 32 ? TEST_EPSILON_FLOAT32 :
                 TEST_EPSILON_FLOAT16;
@@ -7372,6 +7400,12 @@ var Environment = (function () {
         else if (feature === 'EPSILON') {
             return this.backend.floatPrecision() === 32 ? EPSILON_FLOAT32 :
                 EPSILON_FLOAT16;
+        }
+        else if (feature === 'PROD') {
+            return false;
+        }
+        else if (feature === 'TENSORLIKE_CHECK_SHAPE_CONSISTENCY') {
+            return !this.get('PROD');
         }
         throw new Error("Unknown feature " + feature + ".");
     };
@@ -7470,7 +7504,7 @@ function getOrMakeEnvironment() {
 exports.ENV = getOrMakeEnvironment();
 
 }).call(this,require('_process'))
-},{"./device_util":49,"./engine":50,"./environment_util":52,"./tensor":178,"./tensor_util":180,"_process":570}],52:[function(require,module,exports){
+},{"./device_util":49,"./engine":50,"./environment_util":52,"./tensor":187,"./tensor_util":189,"_process":582}],52:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var Type;
@@ -7480,7 +7514,10 @@ var Type;
     Type[Type["STRING"] = 2] = "STRING";
 })(Type = exports.Type || (exports.Type = {}));
 exports.URL_PROPERTIES = [
-    { name: 'DEBUG', type: Type.BOOLEAN }, { name: 'IS_BROWSER', type: Type.BOOLEAN },
+    { name: 'DEBUG', type: Type.BOOLEAN },
+    { name: 'IS_BROWSER', type: Type.BOOLEAN },
+    { name: 'WEBGL_CONV_IM2COL', type: Type.BOOLEAN },
+    { name: 'WEBGL_MAX_TEXTURE_SIZE', type: Type.NUMBER },
     { name: 'WEBGL_PAGING_ENABLED', type: Type.BOOLEAN },
     { name: 'WEBGL_DISJOINT_QUERY_TIMER_EXTENSION_VERSION', type: Type.NUMBER },
     { name: 'WEBGL_DISJOINT_QUERY_TIMER_EXTENSION_RELIABLE', type: Type.BOOLEAN },
@@ -7488,7 +7525,11 @@ exports.URL_PROPERTIES = [
     { name: 'WEBGL_RENDER_FLOAT32_ENABLED', type: Type.BOOLEAN },
     { name: 'WEBGL_DOWNLOAD_FLOAT_ENABLED', type: Type.BOOLEAN },
     { name: 'WEBGL_FENCE_API_ENABLED', type: Type.BOOLEAN },
-    { name: 'BACKEND', type: Type.STRING }, { name: 'EPSILON', type: Type.NUMBER }
+    { name: 'WEBGL_SIZE_UPLOAD_UNIFORM', type: Type.NUMBER },
+    { name: 'BACKEND', type: Type.STRING },
+    { name: 'EPSILON', type: Type.NUMBER },
+    { name: 'PROD', type: Type.BOOLEAN },
+    { name: 'TENSORLIKE_CHECK_SHAPE_CONSISTENCY', type: Type.BOOLEAN },
 ];
 function isWebGLVersionEnabled(webGLVersion, isBrowser) {
     var gl;
@@ -7505,6 +7546,15 @@ function isWebGLVersionEnabled(webGLVersion, isBrowser) {
     return false;
 }
 exports.isWebGLVersionEnabled = isWebGLVersionEnabled;
+var MAX_TEXTURE_SIZE;
+function getWebGLMaxTextureSize(webGLVersion, isBrowser) {
+    if (MAX_TEXTURE_SIZE == null) {
+        var gl = getWebGLRenderingContext(webGLVersion, isBrowser);
+        MAX_TEXTURE_SIZE = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    }
+    return MAX_TEXTURE_SIZE;
+}
+exports.getWebGLMaxTextureSize = getWebGLMaxTextureSize;
 function getWebGLDisjointQueryTimerVersion(webGLVersion, isBrowser) {
     if (webGLVersion === 0) {
         return 0;
@@ -7808,7 +7858,7 @@ function checkGrads(grads) {
     }
 }
 
-},{"./environment":51,"./tensor":178,"./util":185}],55:[function(require,module,exports){
+},{"./environment":51,"./tensor":187,"./util":194}],55:[function(require,module,exports){
 "use strict";
 function __export(m) {
     for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
@@ -7874,7 +7924,7 @@ exports.DataStorage = backend_1.DataStorage;
 var ops = require("./ops/ops");
 tensor_1.setOpHandler(ops);
 
-},{"./browser_util":48,"./environment":51,"./globals":53,"./io/io":59,"./kernels/backend":67,"./kernels/backend_cpu":68,"./kernels/backend_webgl":70,"./ops/loss_ops":141,"./ops/ops":148,"./optimizers/adadelta_optimizer":166,"./optimizers/adagrad_optimizer":167,"./optimizers/adam_optimizer":168,"./optimizers/adamax_optimizer":169,"./optimizers/momentum_optimizer":170,"./optimizers/optimizer":171,"./optimizers/rmsprop_optimizer":173,"./optimizers/sgd_optimizer":174,"./serialization":176,"./tensor":178,"./test_util":182,"./train":183,"./types":184,"./util":185,"./version":186,"./webgl":187}],56:[function(require,module,exports){
+},{"./browser_util":48,"./environment":51,"./globals":53,"./io/io":59,"./kernels/backend":67,"./kernels/backend_cpu":68,"./kernels/backend_webgl":70,"./ops/loss_ops":147,"./ops/ops":154,"./optimizers/adadelta_optimizer":175,"./optimizers/adagrad_optimizer":176,"./optimizers/adam_optimizer":177,"./optimizers/adamax_optimizer":178,"./optimizers/momentum_optimizer":179,"./optimizers/optimizer":180,"./optimizers/rmsprop_optimizer":182,"./optimizers/sgd_optimizer":183,"./serialization":185,"./tensor":187,"./test_util":191,"./train":192,"./types":193,"./util":194,"./version":195,"./webgl":196}],56:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8366,7 +8416,7 @@ function browserHTTPRequest(path, requestInit) {
 }
 exports.browserHTTPRequest = browserHTTPRequest;
 
-},{"../util":185,"./io_utils":60,"./router_registry":64,"./weights_loader":66}],58:[function(require,module,exports){
+},{"../util":194,"./io_utils":60,"./router_registry":64,"./weights_loader":66}],58:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8947,7 +8997,7 @@ function getModelArtifactsInfoForJSON(modelArtifacts) {
 exports.getModelArtifactsInfoForJSON = getModelArtifactsInfoForJSON;
 
 }).call(this,require("buffer").Buffer)
-},{"../ops/tensor_ops":162,"../util":185,"./types":65,"buffer":243}],61:[function(require,module,exports){
+},{"../ops/tensor_ops":171,"../util":194,"./types":65,"buffer":255}],61:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -9195,7 +9245,7 @@ if (environment_1.ENV.get('IS_BROWSER')) {
     }
 }
 
-},{"../environment":51,"../util":185,"./io_utils":60,"./model_management":62,"./router_registry":64}],62:[function(require,module,exports){
+},{"../environment":51,"../util":194,"./io_utils":60,"./model_management":62,"./router_registry":64}],62:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -9399,7 +9449,7 @@ function moveModel(sourceURL, destURL) {
 }
 exports.moveModel = moveModel;
 
-},{"../util":185,"./router_registry":64}],63:[function(require,module,exports){
+},{"../util":194,"./router_registry":64}],63:[function(require,module,exports){
 "use strict";
 var __assign = (this && this.__assign) || Object.assign || function(t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
@@ -9708,7 +9758,7 @@ function loadWeights(manifest, filePathPrefix, weightNames, requestOptions) {
 }
 exports.loadWeights = loadWeights;
 
-},{"../util":185,"./io_utils":60,"./types":65}],67:[function(require,module,exports){
+},{"../util":194,"./io_utils":60,"./types":65}],67:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var DataStorage = (function () {
@@ -9781,8 +9831,10 @@ var axis_util = require("../ops/axis_util");
 var broadcast_util = require("../ops/broadcast_util");
 var concat_util = require("../ops/concat_util");
 var erf_util = require("../ops/erf_util");
+var gather_nd_util = require("../ops/gather_nd_util");
 var ops = require("../ops/ops");
 var ops_1 = require("../ops/ops");
+var scatter_nd_util = require("../ops/scatter_nd_util");
 var selu_util = require("../ops/selu_util");
 var slice_util_1 = require("../ops/slice_util");
 var tensor_1 = require("../tensor");
@@ -10147,6 +10199,24 @@ var MathBackendCPU = (function () {
                 sum += aVals[offset + j];
             }
             vals[i] = sum;
+        }
+        return result;
+    };
+    MathBackendCPU.prototype.prod = function (x, axes) {
+        this.assertNotComplex(x, 'sum');
+        var _a = axis_util.computeOutAndReduceShapes(x.shape, axes), outShape = _a[0], reduceShape = _a[1];
+        var resultDtype = types_1.upcastType(x.dtype, 'int32');
+        var result = ops.zeros(outShape, resultDtype);
+        var reduceSize = util.sizeFromShape(reduceShape);
+        var vals = result.dataSync();
+        var aVals = x.dataSync();
+        for (var i = 0; i < vals.length; ++i) {
+            var offset = i * reduceSize;
+            var prod = 1;
+            for (var j = 0; j < reduceSize; ++j) {
+                prod *= aVals[offset + j];
+            }
+            vals[i] = prod;
         }
         return result;
     };
@@ -11389,7 +11459,8 @@ var MathBackendCPU = (function () {
     MathBackendCPU.prototype.resizeBilinear = function (x, newHeight, newWidth, alignCorners) {
         this.assertNotComplex(x, 'resizeBilinear');
         var _a = x.shape, batch = _a[0], oldHeight = _a[1], oldWidth = _a[2], numChannels = _a[3];
-        var output = ops.buffer([batch, newHeight, newWidth, numChannels], x.dtype);
+        var xValues = x.dataSync();
+        var result = new Float32Array(util.sizeFromShape([batch, newHeight, newWidth, numChannels]));
         var effectiveInputSize = [
             (alignCorners && newHeight > 1) ? oldHeight - 1 : oldHeight,
             (alignCorners && newWidth > 1) ? oldWidth - 1 : oldWidth
@@ -11398,37 +11469,46 @@ var MathBackendCPU = (function () {
             (alignCorners && newHeight > 1) ? newHeight - 1 : newHeight,
             (alignCorners && newWidth > 1) ? newWidth - 1 : newWidth
         ];
+        var outputIdx = 0;
+        var effectiveRowSizeRatio = effectiveInputSize[0] / effectiveOutputSize[0];
+        var effectiveColSizeRatio = effectiveInputSize[1] / effectiveOutputSize[1];
         for (var b = 0; b < batch; b++) {
             for (var r = 0; r < newHeight; r++) {
+                var sourceFracRow = effectiveRowSizeRatio * r;
+                var sourceRowFloor = Math.floor(sourceFracRow);
+                var rowFrac = sourceFracRow - sourceRowFloor;
+                var sourceRowCeil = Math.min(oldHeight - 1, Math.ceil(sourceFracRow));
+                var topRowOffset = b * x.strides[0] + sourceRowFloor * x.strides[1];
+                var botRowOffset = b * x.strides[0] + sourceRowCeil * x.strides[1];
                 for (var c = 0; c < newWidth; c++) {
+                    var sourceFracCol = effectiveColSizeRatio * c;
+                    var sourceColFloor = Math.floor(sourceFracCol);
+                    var colFrac = sourceFracCol - sourceColFloor;
+                    var sourceColCeil = Math.min(oldWidth - 1, Math.ceil(sourceFracCol));
+                    var topLeftOffest = topRowOffset + sourceColFloor * x.strides[2];
+                    var botLeftOffset = botRowOffset + sourceColFloor * x.strides[2];
+                    var topRightOffset = topRowOffset + +sourceColCeil * x.strides[2];
+                    var botRightOffest = botRowOffset + sourceColCeil * x.strides[2];
                     for (var d = 0; d < numChannels; d++) {
-                        var sourceFracRow = (effectiveInputSize[0]) * r / (effectiveOutputSize[0]);
-                        var sourceFracCol = (effectiveInputSize[1]) * c / (effectiveOutputSize[1]);
-                        var sourceRowFloor = Math.floor(sourceFracRow);
-                        var sourceRowCeil = Math.min(oldHeight - 1, Math.ceil(sourceFracRow));
-                        var sourceColFloor = Math.floor(sourceFracCol);
-                        var sourceColCeil = Math.min(oldWidth - 1, Math.ceil(sourceFracCol));
-                        var topLeft = x.get(b, sourceRowFloor, sourceColFloor, d);
-                        var bottomLeft = x.get(b, sourceRowCeil, sourceColFloor, d);
-                        var topRight = x.get(b, sourceRowFloor, sourceColCeil, d);
-                        var bottomRight = x.get(b, sourceRowCeil, sourceColCeil, d);
-                        var rowFrac = sourceFracRow - sourceRowFloor;
-                        var colFrac = sourceFracCol - sourceColFloor;
+                        var topLeft = xValues[topLeftOffest + d];
+                        var bottomLeft = xValues[botLeftOffset + d];
+                        var topRight = xValues[topRightOffset + d];
+                        var bottomRight = xValues[botRightOffest + d];
                         var top_1 = topLeft + (topRight - topLeft) * colFrac;
                         var bottom = bottomLeft + (bottomRight - bottomLeft) * colFrac;
                         var newValue = top_1 + (bottom - top_1) * rowFrac;
-                        output.set(newValue, b, r, c, d);
+                        result[outputIdx++] = newValue;
                     }
                 }
             }
         }
-        return output.toTensor();
+        return ops.tensor(result, [batch, newHeight, newWidth, numChannels]);
     };
     MathBackendCPU.prototype.resizeBilinearBackprop = function (dy, x, alignCorners) {
         this.assertNotComplex([dy, x], 'resizeBilinearBackprop');
         var _a = x.shape, batch = _a[0], xHeight = _a[1], xWidth = _a[2], depth = _a[3];
         var _b = dy.shape, yHeight = _b[1], yWidth = _b[2];
-        var output = ops.buffer([batch, xHeight, xWidth, depth], x.dtype);
+        var output = new Float32Array(batch * xHeight * xWidth * depth);
         var effectiveXSize = [
             (alignCorners && yHeight > 1) ? xHeight - 1 : xHeight,
             (alignCorners && yWidth > 1) ? xWidth - 1 : xWidth
@@ -11439,11 +11519,16 @@ var MathBackendCPU = (function () {
         ];
         var heightScale = effectiveXSize[0] / effectiveYSize[0];
         var widthScale = effectiveXSize[1] / effectiveYSize[1];
+        var dyValues = dy.dataSync();
+        var offset = 0;
         for (var b = 0; b < batch; b++) {
+            var bOffset = b * x.strides[0];
             for (var r = 0; r < yHeight; r++) {
                 var dxR = r * heightScale;
                 var topDxRIndex = Math.floor(dxR);
                 var bottomDxRIndex = Math.min(Math.ceil(dxR), xHeight - 1);
+                var topDxROffset = bOffset + topDxRIndex * x.strides[1];
+                var bottomDxROffset = bOffset + bottomDxRIndex * x.strides[1];
                 var dxRLerp = dxR - topDxRIndex;
                 var inverseDxRLerp = 1.0 - dxRLerp;
                 for (var c = 0; c < yWidth; c++) {
@@ -11452,25 +11537,27 @@ var MathBackendCPU = (function () {
                     var rightDxCIndex = Math.min(Math.ceil(dxC), xWidth - 1);
                     var dxCLerp = dxC - leftDxCIndex;
                     var inverseDxCLerp = 1.0 - dxCLerp;
+                    var topLeftRCOffset = topDxROffset + leftDxCIndex * x.strides[2];
+                    var topRightRCOffset = topDxROffset + rightDxCIndex * x.strides[2];
+                    var bottomLeftRCOffset = bottomDxROffset + leftDxCIndex * x.strides[2];
+                    var bottomRightRCOffset = bottomDxROffset + rightDxCIndex * x.strides[2];
+                    var inverseDxRLerpTimesInverseDxCLerp = inverseDxRLerp * inverseDxCLerp;
+                    var inverseDxRLerpTimesDxCLerp = inverseDxRLerp * dxCLerp;
+                    var dxRLerpTimesInverseDxCLerp = dxRLerp * inverseDxCLerp;
+                    var dxRLerpTimesDxCLerp = dxRLerp * dxCLerp;
                     for (var d = 0; d < depth; d++) {
-                        var dyVal = dy.get(b, r, c, d);
-                        var topLeft = output.get(b, topDxRIndex, leftDxCIndex, d);
-                        topLeft += dyVal * inverseDxRLerp * inverseDxCLerp;
-                        output.set(topLeft, b, topDxRIndex, leftDxCIndex, d);
-                        var topRight = output.get(b, topDxRIndex, rightDxCIndex, d);
-                        topRight += dyVal * inverseDxRLerp * dxCLerp;
-                        output.set(topRight, b, topDxRIndex, rightDxCIndex, d);
-                        var bottomLeft = output.get(b, bottomDxRIndex, leftDxCIndex, d);
-                        bottomLeft += dyVal * dxRLerp * inverseDxCLerp;
-                        output.set(bottomLeft, b, bottomDxRIndex, leftDxCIndex, d);
-                        var bottomRight = output.get(b, bottomDxRIndex, rightDxCIndex, d);
-                        bottomRight += dyVal * dxRLerp * dxCLerp;
-                        output.set(bottomRight, b, bottomDxRIndex, rightDxCIndex, d);
+                        var dyVal = dyValues[offset++];
+                        output[topLeftRCOffset + d] +=
+                            dyVal * inverseDxRLerpTimesInverseDxCLerp;
+                        output[topRightRCOffset + d] += dyVal * inverseDxRLerpTimesDxCLerp;
+                        output[bottomLeftRCOffset + d] +=
+                            dyVal * dxRLerpTimesInverseDxCLerp;
+                        output[bottomRightRCOffset + d] += dyVal * dxRLerpTimesDxCLerp;
                     }
                 }
             }
         }
-        return output.toTensor();
+        return ops.tensor4d(output, [batch, xWidth, xHeight, depth], x.dtype);
     };
     MathBackendCPU.prototype.resizeNearestNeighbor = function (x, newHeight, newWidth, alignCorners) {
         this.assertNotComplex(x, 'resizeNearestNeighbor');
@@ -11696,6 +11783,57 @@ var MathBackendCPU = (function () {
         var scoresVals = scores.dataSync();
         return non_max_suppression_impl_1.nonMaxSuppressionImpl(boxesVals, scoresVals, maxOutputSize, iouThreshold, scoreThreshold);
     };
+    MathBackendCPU.prototype.fft = function (input) {
+        util.assert(input.shape.length > 0, 'input must have at least one rank.');
+        var n = input.shape[0];
+        if (this.is_exponent_of_2(n)) {
+            return this.fftRadix2(input, n);
+        }
+        else {
+            var data = input.dataSync();
+            var rawOutput = this.fourierTransformByMatmul(data, n);
+            var output = complex_util.splitRealAndImagArrays(rawOutput);
+            return ops.complex(output.real, output.imag).as1D();
+        }
+    };
+    MathBackendCPU.prototype.is_exponent_of_2 = function (size) {
+        return (size & size - 1) === 0;
+    };
+    MathBackendCPU.prototype.fftRadix2 = function (input, size) {
+        if (size === 1) {
+            return input;
+        }
+        var data = input.dataSync();
+        var half = size / 2;
+        var evenComplex = complex_util.complexWithEvenIndex(data);
+        var evenTensor = ops.complex(evenComplex.real, evenComplex.imag).as1D();
+        var oddComplex = complex_util.complexWithOddIndex(data);
+        var oddTensor = ops.complex(oddComplex.real, oddComplex.imag).as1D();
+        evenTensor = this.fftRadix2(evenTensor, half);
+        oddTensor = this.fftRadix2(oddTensor, half);
+        var e = complex_util.exponents(size);
+        var exponent = ops.complex(e.real, e.imag).mul(oddTensor);
+        var addPart = evenTensor.add(exponent);
+        var subPart = evenTensor.sub(exponent);
+        var realTensor = ops.real(addPart).concat(ops.real(subPart));
+        var imagTensor = ops.imag(addPart).concat(ops.imag(subPart));
+        return ops.complex(realTensor, imagTensor).as1D();
+    };
+    MathBackendCPU.prototype.fourierTransformByMatmul = function (data, size) {
+        var ret = new Float32Array(size * 2);
+        for (var r = 0; r < size; r++) {
+            var real = 0.0;
+            var imag = 0.0;
+            for (var c = 0; c < size; c++) {
+                var e = complex_util.exponent(r * c, size);
+                var term = complex_util.getComplexWithIndex(data, c);
+                real += term.real * e.real - term.imag * e.imag;
+                imag += term.real * e.imag + term.imag * e.real;
+            }
+            complex_util.assignToTypedArray(ret, real, imag, r);
+        }
+        return ret;
+    };
     MathBackendCPU.prototype.depthToSpace = function (x, blockSize, dataFormat) {
         util.assert(dataFormat === 'NHWC', "Only NHWC dataFormat supported on CPU for depthToSpace. Got " + dataFormat);
         util.assert(blockSize > 1, "blockSize should be > 1 for depthToSpace, but was: " + blockSize);
@@ -11907,12 +12045,66 @@ var MathBackendCPU = (function () {
         }
         return output.toTensor();
     };
+    MathBackendCPU.prototype.gatherND = function (x, indices) {
+        var indicesShape = indices.shape;
+        var sliceRank = indicesShape[indicesShape.length - 1];
+        var _a = gather_nd_util.prepareAndValidate(x, indices), resultShape = _a[0], numSlices = _a[1], sliceSize = _a[2], strides = _a[3];
+        if (numSlices === 0) {
+            return ops_1.tensor([], resultShape, x.dtype);
+        }
+        var buffer = new tensor_1.TensorBuffer([numSlices, sliceSize], x.dtype);
+        var indicesData = indices.dataSync();
+        var xData = x.dataSync();
+        for (var i = 0; i < numSlices; i++) {
+            var index = [];
+            var flattenIndex = 0;
+            for (var j = 0; j < sliceRank; j++) {
+                var dim = indicesData[i * sliceRank + j];
+                flattenIndex += dim * strides[j];
+                index.push(dim);
+            }
+            if (flattenIndex < 0 || flattenIndex >= x.size / sliceSize) {
+                throw new Error("Invalid indices: " + index + " does not index into " + x.shape);
+            }
+            for (var k = 0; k < sliceSize; k++) {
+                buffer.values[i * sliceSize + k] = xData[flattenIndex * sliceSize + k];
+            }
+        }
+        return buffer.toTensor().reshape(resultShape);
+    };
+    MathBackendCPU.prototype.scatterND = function (indices, updates, shape) {
+        var _a = scatter_nd_util.prepareAndValidate(updates, indices, shape), sliceRank = _a[0], numUpdates = _a[1], sliceSize = _a[2], strides = _a[3], outputSize = _a[4];
+        var flattenShape = [outputSize / sliceSize, sliceSize];
+        var indicesData = indices.dataSync();
+        var updatesData = updates.dataSync();
+        if (outputSize === 0) {
+            return ops_1.tensor([], shape, updates.dtype);
+        }
+        var buffer = new tensor_1.TensorBuffer(flattenShape, updates.dtype);
+        for (var i = 0; i < numUpdates; i++) {
+            var index = [];
+            var flattenIndex = 0;
+            for (var j = 0; j < sliceRank; j++) {
+                var dim = indicesData[i * sliceRank + j];
+                index.push(dim);
+                flattenIndex += dim * strides[j];
+            }
+            if (flattenIndex < 0 || flattenIndex >= outputSize / sliceSize) {
+                throw new Error("Invalid indices: " + index + " does not index into " + shape);
+            }
+            for (var k = 0; k < sliceSize; k++) {
+                buffer.values[flattenIndex * sliceSize + k] +=
+                    updatesData[i * sliceSize + k];
+            }
+        }
+        return buffer.toTensor().reshape(shape);
+    };
     return MathBackendCPU;
 }());
 exports.MathBackendCPU = MathBackendCPU;
 environment_1.ENV.registerBackend('cpu', function () { return new MathBackendCPU(); }, 1, tensor_1.setTensorTracker);
 
-},{"../environment":51,"../log":124,"../ops/array_ops_util":126,"../ops/axis_util":127,"../ops/broadcast_util":130,"../ops/concat_util":134,"../ops/erf_util":137,"../ops/ops":148,"../ops/selu_util":157,"../ops/slice_util":159,"../tensor":178,"../types":184,"../util":185,"./backend":67,"./backend_util":69,"./complex_util":71,"./non_max_suppression_impl":72,"./split_shared":73,"./topk_impl":74,"./where_impl":123,"seedrandom":596}],69:[function(require,module,exports){
+},{"../environment":51,"../log":128,"../ops/array_ops_util":130,"../ops/axis_util":131,"../ops/broadcast_util":134,"../ops/concat_util":138,"../ops/erf_util":141,"../ops/gather_nd_util":143,"../ops/ops":154,"../ops/scatter_nd_util":162,"../ops/selu_util":165,"../ops/slice_util":167,"../tensor":187,"../types":193,"../util":194,"./backend":67,"./backend_util":69,"./complex_util":71,"./non_max_suppression_impl":72,"./split_shared":73,"./topk_impl":74,"./where_impl":127,"seedrandom":608}],69:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tensor_ops_1 = require("../ops/tensor_ops");
@@ -11958,7 +12150,7 @@ function reshapeTensor(x, shape) {
 }
 exports.reshapeTensor = reshapeTensor;
 
-},{"../ops/tensor_ops":162,"../tensor":178,"../util":185}],70:[function(require,module,exports){
+},{"../ops/tensor_ops":171,"../tensor":187,"../util":194}],70:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -12002,7 +12194,9 @@ var log_1 = require("../log");
 var array_ops_util = require("../ops/array_ops_util");
 var axis_util = require("../ops/axis_util");
 var concat_util_1 = require("../ops/concat_util");
+var gather_nd_util = require("../ops/gather_nd_util");
 var reduce_util = require("../ops/reduce_util");
+var scatter_nd_util = require("../ops/scatter_nd_util");
 var segment_util = require("../ops/segment_util");
 var slice_util_1 = require("../ops/slice_util");
 var softmax_1 = require("../ops/softmax");
@@ -12034,11 +12228,15 @@ var crop_and_resize_gpu_1 = require("./webgl/crop_and_resize_gpu");
 var cumsum_gpu_1 = require("./webgl/cumsum_gpu");
 var depth_to_space_gpu_1 = require("./webgl/depth_to_space_gpu");
 var encode_float_gpu_1 = require("./webgl/encode_float_gpu");
+var fft_gpu = require("./webgl/fft_gpu");
+var fft_gpu_1 = require("./webgl/fft_gpu");
 var from_pixels_gpu_1 = require("./webgl/from_pixels_gpu");
 var gather_gpu_1 = require("./webgl/gather_gpu");
+var gather_nd_gpu_1 = require("./webgl/gather_nd_gpu");
 var gpgpu_context_1 = require("./webgl/gpgpu_context");
 var gpgpu_math = require("./webgl/gpgpu_math");
 var gpgpu_util = require("./webgl/gpgpu_util");
+var im2col_gpu_1 = require("./webgl/im2col_gpu");
 var lrn_gpu_1 = require("./webgl/lrn_gpu");
 var lrn_grad_gpu_1 = require("./webgl/lrn_grad_gpu");
 var max_pool_backprop_gpu_1 = require("./webgl/max_pool_backprop_gpu");
@@ -12055,6 +12253,7 @@ var resize_bilinear_gpu_1 = require("./webgl/resize_bilinear_gpu");
 var resize_nearest_neighbor_backprop_gpu_1 = require("./webgl/resize_nearest_neighbor_backprop_gpu");
 var resize_nearest_neighbor_gpu_1 = require("./webgl/resize_nearest_neighbor_gpu");
 var reverse_gpu_1 = require("./webgl/reverse_gpu");
+var scatter_nd_gpu_1 = require("./webgl/scatter_nd_gpu");
 var segment_gpu_1 = require("./webgl/segment_gpu");
 var select_gpu_1 = require("./webgl/select_gpu");
 var slice_gpu_1 = require("./webgl/slice_gpu");
@@ -12069,7 +12268,7 @@ var unpack_gpu_1 = require("./webgl/unpack_gpu");
 var webgl_util = require("./webgl/webgl_util");
 var where_impl_1 = require("./where_impl");
 var BEFORE_PAGING_CONSTANT = 300;
-exports.SIZE_UPLOAD_UNIFORM = 32;
+exports.SIZE_UPLOAD_UNIFORM = 4;
 var MathBackendWebGL = (function () {
     function MathBackendWebGL(gpgpu, delayedStorage) {
         if (delayedStorage === void 0) { delayedStorage = true; }
@@ -12262,7 +12461,7 @@ var MathBackendWebGL = (function () {
         var _a = this.texData.get(dataId), shape = _a.shape, dtype = _a.dtype, texture = _a.texture, texShape = _a.texShape;
         if (environment_1.ENV.get('WEBGL_DOWNLOAD_FLOAT_ENABLED')) {
             if (this.texData.get(dataId).usage === tex_util_1.TextureUsage.PACK) {
-                return this.gpgpu.downloadMatrixFromPackedTexture(texture, texShape[0], texShape[1]);
+                return this.gpgpu.downloadMatrixFromPackedTexture(texture, shape, texShape[0], texShape[1]);
             }
             else {
                 return this.gpgpu.downloadFloat32MatrixFromOutputTexture(texture, texShape[0], texShape[1]);
@@ -12441,28 +12640,20 @@ var MathBackendWebGL = (function () {
     MathBackendWebGL.prototype.batchMatMul = function (a, b, transposeA, transposeB) {
         var outerShapeA = transposeA ? a.shape[2] : a.shape[1];
         var outerShapeB = transposeB ? b.shape[1] : b.shape[2];
-        if (environment_1.ENV.get('WEBGL_RENDER_FLOAT32_ENABLED') && a.shape[0] === 1 &&
-            b.shape[0] === 1 &&
-            util.arraysEqual(webgl_util.getTextureShapeFromLogicalShape(this.gpgpu.gl, [outerShapeA, outerShapeB]), [outerShapeA, outerShapeB])) {
+        if (a.shape[0] === 1 && b.shape[0] === 1) {
             var aSqueezed = a.as2D(a.shape[1], a.shape[2]);
             var bSqueezed = b.as2D(b.shape[1], b.shape[2]);
             var packProgramA = new pack_gpu_1.PackProgram(aSqueezed.shape);
-            var packedAOutput = tensor_1.Tensor.make(aSqueezed.shape, {});
-            this.texData.get(packedAOutput.dataId).usage = tex_util_1.TextureUsage.PACK;
-            var packedA = this.compileAndRun(packProgramA, [aSqueezed], packedAOutput);
+            var packedA = this.compileAndRun(packProgramA, [aSqueezed], this.makePackedTensor(aSqueezed.shape));
             var packProgramB = new pack_gpu_1.PackProgram(bSqueezed.shape);
-            var packedBOutput = tensor_1.Tensor.make(bSqueezed.shape, {});
-            this.texData.get(packedBOutput.dataId).usage = tex_util_1.TextureUsage.PACK;
-            var packedB = this.compileAndRun(packProgramB, [bSqueezed], packedBOutput);
+            var packedB = this.compileAndRun(packProgramB, [bSqueezed], this.makePackedTensor(bSqueezed.shape));
             var program = new mulmat_packed_gpu_1.MatMulPackedProgram(packedA.shape, packedB.shape, [outerShapeA, outerShapeB], transposeA, transposeB);
-            var packedMatMulOutput = tensor_1.Tensor.make(program.outputShape, {});
-            this.texData.get(packedMatMulOutput.dataId).usage = tex_util_1.TextureUsage.PACK;
-            var result = this.compileAndRun(program, [packedA, packedB], packedMatMulOutput);
+            var result = this.compileAndRun(program, [packedA, packedB], this.makePackedTensor(program.outputShape));
             var unpackProgram = new unpack_gpu_1.UnpackProgram(result.shape);
             var unpacked = this.compileAndRun(unpackProgram, [result]);
-            packedAOutput.dispose();
-            packedBOutput.dispose();
-            packedMatMulOutput.dispose();
+            packedA.dispose();
+            packedB.dispose();
+            result.dispose();
             return unpacked.reshape([1, result.shape[0], result.shape[1]]);
         }
         else {
@@ -12604,6 +12795,13 @@ var MathBackendWebGL = (function () {
         var a2D = x.as2D(-1, inSize);
         var outputDType = types_1.sumOutType(x.dtype);
         return this.reduce(a2D, 'sum', outputDType).reshape(outShape);
+    };
+    MathBackendWebGL.prototype.prod = function (x, axes) {
+        var _a = axis_util.computeOutAndReduceShapes(x.shape, axes), outShape = _a[0], reduceShape = _a[1];
+        var inSize = util.sizeFromShape(reduceShape);
+        var a2D = x.as2D(-1, inSize);
+        var outputDType = types_1.sumOutType(x.dtype);
+        return this.reduce(a2D, 'prod', outputDType).reshape(outShape);
     };
     MathBackendWebGL.prototype.unsortedSegmentSum = function (x, segmentIds, numSegments) {
         var axis = 0;
@@ -12985,7 +13183,30 @@ var MathBackendWebGL = (function () {
         var program = new unaryop_gpu_1.UnaryOpProgram(x.shape, unary_op.STEP(alpha));
         return this.compileAndRun(program, [x]);
     };
+    MathBackendWebGL.prototype.conv2dWithIm2Row = function (x, filter, convInfo) {
+        var filterWidth = convInfo.filterWidth, filterHeight = convInfo.filterHeight, inChannels = convInfo.inChannels, outWidth = convInfo.outWidth, outHeight = convInfo.outHeight;
+        var sharedDim = filterWidth * filterHeight * inChannels;
+        var numCols = outHeight * outWidth;
+        var x2ColShape = [sharedDim, numCols];
+        var xSqueezed = x.squeeze([0]);
+        var w2Row = filter.reshape([sharedDim, -1]);
+        var im2ColProgram = new im2col_gpu_1.Im2ColProgram(x2ColShape, xSqueezed.shape, convInfo);
+        var im2Col = this.compileAndRun(im2ColProgram, [xSqueezed], this.makePackedTensor(x2ColShape));
+        var packedW2RowProgram = new pack_gpu_1.PackProgram(w2Row.shape);
+        var packedW2Row = this.compileAndRun(packedW2RowProgram, [w2Row], this.makePackedTensor(w2Row.shape));
+        var matmulProgram = new mulmat_packed_gpu_1.MatMulPackedProgram(im2Col.shape, packedW2Row.shape, [numCols, convInfo.outChannels], true, false);
+        var product = this.compileAndRun(matmulProgram, [im2Col, packedW2Row], this.makePackedTensor(matmulProgram.outputShape));
+        var unpackProgram = new unpack_gpu_1.UnpackProgram(product.shape);
+        var unpacked = this.compileAndRun(unpackProgram, [product]);
+        im2Col.dispose();
+        packedW2Row.dispose();
+        product.dispose();
+        return unpacked.reshape([1, outHeight, outWidth, convInfo.outChannels]);
+    };
     MathBackendWebGL.prototype.conv2d = function (x, filter, convInfo) {
+        if (environment_1.ENV.get('WEBGL_CONV_IM2COL') && x.shape[0] === 1) {
+            return this.conv2dWithIm2Row(x, filter, convInfo);
+        }
         var program = new conv_gpu_1.Conv2DProgram(convInfo);
         return this.compileAndRun(program, [x, filter]);
     };
@@ -13098,8 +13319,50 @@ var MathBackendWebGL = (function () {
     MathBackendWebGL.prototype.split = function (x, sizeSplits, axis) {
         return split_shared_1.split(x, sizeSplits, axis);
     };
+    MathBackendWebGL.prototype.scatterND = function (indices, updates, shape) {
+        var _a = scatter_nd_util.prepareAndValidate(updates, indices, shape), sliceDim = _a[0], numUpdates = _a[1], sliceSize = _a[2], strides = _a[3], outputSize = _a[4];
+        var flattenShape = [outputSize / sliceSize, sliceSize];
+        var flattenIndices = indices.reshape([numUpdates, sliceDim]);
+        var flattenX = updates.reshape([numUpdates, sliceSize]);
+        if (outputSize === 0) {
+            return backend_util.reshapeTensor(tensor_ops_1.tensor([]), shape);
+        }
+        var program = new scatter_nd_gpu_1.ScatterNDProgram(numUpdates, sliceDim, strides, flattenShape);
+        return this.compileAndRun(program, [flattenX, flattenIndices])
+            .reshape(shape);
+    };
+    MathBackendWebGL.prototype.fft = function (x) {
+        var xData = this.texData.get(x.dataId);
+        var realProgram = new fft_gpu_1.FFTProgram(fft_gpu.COMPLEX_FFT.REAL, x.shape);
+        var imagProgram = new fft_gpu_1.FFTProgram(fft_gpu.COMPLEX_FFT.IMAG, x.shape);
+        var inputs = [
+            this.makeComplexComponentTensorHandle(x, xData.complexTensors.real),
+            this.makeComplexComponentTensorHandle(x, xData.complexTensors.imag),
+        ];
+        var real = this.compileAndRun(realProgram, inputs);
+        var imag = this.compileAndRun(imagProgram, inputs);
+        var complex = this.complex(real, imag).as1D();
+        real.dispose();
+        imag.dispose();
+        return complex;
+    };
+    MathBackendWebGL.prototype.gatherND = function (x, indices) {
+        var indicesShape = indices.shape;
+        var sliceRank = indicesShape[indicesShape.length - 1];
+        var _a = gather_nd_util.prepareAndValidate(x, indices), resultShape = _a[0], numSlices = _a[1], sliceSize = _a[2], strides = _a[3];
+        var flattenIndices = indices.reshape([numSlices, sliceRank]);
+        var flattenX = x.reshape([x.size / sliceSize, sliceSize]);
+        var program = new gather_nd_gpu_1.GatherNDProgram(sliceRank, strides, [numSlices, sliceSize]);
+        return this.compileAndRun(program, [flattenX, flattenIndices])
+            .reshape(resultShape);
+    };
     MathBackendWebGL.prototype.makeOutputArray = function (shape, dtype) {
         return tensor_1.Tensor.make(shape, {}, dtype);
+    };
+    MathBackendWebGL.prototype.makePackedTensor = function (shape) {
+        var packedTensor = tensor_1.Tensor.make(shape, {});
+        this.texData.get(packedTensor.dataId).usage = tex_util_1.TextureUsage.PACK;
+        return packedTensor;
     };
     MathBackendWebGL.prototype.compileAndRun = function (program, inputs, output, customSetup, pageToCpu) {
         var _this = this;
@@ -13121,7 +13384,8 @@ var MathBackendWebGL = (function () {
             }
             var texData = _this.texData.get(input.dataId);
             if (texData.texture == null &&
-                util.sizeFromShape(input.shape) <= exports.SIZE_UPLOAD_UNIFORM) {
+                util.sizeFromShape(input.shape) <=
+                    environment_1.ENV.get('WEBGL_SIZE_UPLOAD_UNIFORM')) {
                 return {
                     shape: input.shape,
                     texData: null,
@@ -13202,11 +13466,13 @@ var MathBackendWebGL = (function () {
     MathBackendWebGL.prototype.uploadToGPU = function (dataId) {
         var texData = this.texData.get(dataId);
         var shape = texData.shape, values = texData.values, texture = texData.texture, dtype = texData.dtype, usage = texData.usage;
-        if (environment_1.ENV.get('WEBGL_PAGING_ENABLED') && texture != null) {
-            var index = this.lruDataGPU.indexOf(dataId);
-            if (index >= 0) {
-                this.lruDataGPU.splice(this.lruDataGPU.indexOf(dataId), 1);
-                this.lruDataGPU.push(dataId);
+        if (texture != null) {
+            if (environment_1.ENV.get('WEBGL_PAGING_ENABLED')) {
+                var index = this.lruDataGPU.indexOf(dataId);
+                if (index >= 0) {
+                    this.lruDataGPU.splice(this.lruDataGPU.indexOf(dataId), 1);
+                    this.lruDataGPU.push(dataId);
+                }
             }
             return;
         }
@@ -13215,7 +13481,7 @@ var MathBackendWebGL = (function () {
         if (shouldTimeProgram) {
             start = performance.now();
         }
-        var texShape = webgl_util.getTextureShapeFromLogicalShape(this.gpgpu.gl, shape);
+        var texShape = webgl_util.getTextureShapeFromLogicalShape(shape, usage);
         texData.texShape = texShape;
         var newTexture = this.acquireTexture(dataId, texShape, usage);
         texData.texture = newTexture;
@@ -13289,7 +13555,7 @@ function typedArrayToFloat32(a, dtype) {
     return (a instanceof Float32Array) ? a : new Float32Array(a);
 }
 
-},{"../environment":51,"../globals":53,"../log":124,"../ops/array_ops_util":126,"../ops/axis_util":127,"../ops/concat_util":134,"../ops/reduce_util":151,"../ops/segment_util":156,"../ops/slice_util":159,"../ops/softmax":160,"../ops/tensor_ops":162,"../tensor":178,"../types":184,"../util":185,"./backend":67,"./backend_util":69,"./complex_util":71,"./non_max_suppression_impl":72,"./split_shared":73,"./topk_impl":74,"./webgl/argminmax_gpu":75,"./webgl/avg_pool_backprop_gpu":76,"./webgl/batchnorm_gpu":77,"./webgl/binaryop_complex_gpu":78,"./webgl/binaryop_gpu":79,"./webgl/clip_gpu":80,"./webgl/concat_gpu":81,"./webgl/conv_backprop_gpu":82,"./webgl/conv_backprop_gpu_depthwise":83,"./webgl/conv_gpu":84,"./webgl/conv_gpu_depthwise":85,"./webgl/crop_and_resize_gpu":86,"./webgl/cumsum_gpu":87,"./webgl/depth_to_space_gpu":88,"./webgl/encode_float_gpu":89,"./webgl/from_pixels_gpu":90,"./webgl/gather_gpu":91,"./webgl/gpgpu_context":92,"./webgl/gpgpu_math":93,"./webgl/gpgpu_util":94,"./webgl/lrn_gpu":95,"./webgl/lrn_grad_gpu":96,"./webgl/max_pool_backprop_gpu":97,"./webgl/mulmat_gpu":98,"./webgl/mulmat_packed_gpu":99,"./webgl/multinomial_gpu":100,"./webgl/onehot_gpu":101,"./webgl/pack_gpu":102,"./webgl/pad_gpu":103,"./webgl/pool_gpu":104,"./webgl/reduce_gpu":105,"./webgl/resize_bilinear_backprop_gpu":106,"./webgl/resize_bilinear_gpu":107,"./webgl/resize_nearest_neighbor_backprop_gpu":108,"./webgl/resize_nearest_neighbor_gpu":109,"./webgl/reverse_gpu":110,"./webgl/segment_gpu":111,"./webgl/select_gpu":112,"./webgl/slice_gpu":114,"./webgl/strided_slice_gpu":115,"./webgl/tex_util":116,"./webgl/texture_manager":117,"./webgl/tile_gpu":118,"./webgl/transpose_gpu":119,"./webgl/unaryop_gpu":120,"./webgl/unpack_gpu":121,"./webgl/webgl_util":122,"./where_impl":123}],71:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../log":128,"../ops/array_ops_util":130,"../ops/axis_util":131,"../ops/concat_util":138,"../ops/gather_nd_util":143,"../ops/reduce_util":157,"../ops/scatter_nd_util":162,"../ops/segment_util":164,"../ops/slice_util":167,"../ops/softmax":168,"../ops/tensor_ops":171,"../tensor":187,"../types":193,"../util":194,"./backend":67,"./backend_util":69,"./complex_util":71,"./non_max_suppression_impl":72,"./split_shared":73,"./topk_impl":74,"./webgl/argminmax_gpu":75,"./webgl/avg_pool_backprop_gpu":76,"./webgl/batchnorm_gpu":77,"./webgl/binaryop_complex_gpu":78,"./webgl/binaryop_gpu":79,"./webgl/clip_gpu":80,"./webgl/concat_gpu":81,"./webgl/conv_backprop_gpu":82,"./webgl/conv_backprop_gpu_depthwise":83,"./webgl/conv_gpu":84,"./webgl/conv_gpu_depthwise":85,"./webgl/crop_and_resize_gpu":86,"./webgl/cumsum_gpu":87,"./webgl/depth_to_space_gpu":88,"./webgl/encode_float_gpu":89,"./webgl/fft_gpu":90,"./webgl/from_pixels_gpu":91,"./webgl/gather_gpu":92,"./webgl/gather_nd_gpu":93,"./webgl/gpgpu_context":94,"./webgl/gpgpu_math":95,"./webgl/gpgpu_util":96,"./webgl/im2col_gpu":97,"./webgl/lrn_gpu":98,"./webgl/lrn_grad_gpu":99,"./webgl/max_pool_backprop_gpu":100,"./webgl/mulmat_gpu":101,"./webgl/mulmat_packed_gpu":102,"./webgl/multinomial_gpu":103,"./webgl/onehot_gpu":104,"./webgl/pack_gpu":105,"./webgl/pad_gpu":106,"./webgl/pool_gpu":107,"./webgl/reduce_gpu":108,"./webgl/resize_bilinear_backprop_gpu":109,"./webgl/resize_bilinear_gpu":110,"./webgl/resize_nearest_neighbor_backprop_gpu":111,"./webgl/resize_nearest_neighbor_gpu":112,"./webgl/reverse_gpu":113,"./webgl/scatter_nd_gpu":114,"./webgl/segment_gpu":115,"./webgl/select_gpu":116,"./webgl/slice_gpu":118,"./webgl/strided_slice_gpu":119,"./webgl/tex_util":120,"./webgl/texture_manager":121,"./webgl/tile_gpu":122,"./webgl/transpose_gpu":123,"./webgl/unaryop_gpu":124,"./webgl/unpack_gpu":125,"./webgl/webgl_util":126,"./where_impl":127}],71:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 function mergeRealAndImagArrays(real, imag) {
@@ -13315,6 +13581,57 @@ function splitRealAndImagArrays(complex) {
     return { real: real, imag: imag };
 }
 exports.splitRealAndImagArrays = splitRealAndImagArrays;
+function complexWithEvenIndex(complex) {
+    var len = Math.ceil(complex.length / 4);
+    var real = new Float32Array(len);
+    var imag = new Float32Array(len);
+    for (var i = 0; i < complex.length; i += 4) {
+        real[Math.floor(i / 4)] = complex[i];
+        imag[Math.floor(i / 4)] = complex[i + 1];
+    }
+    return { real: real, imag: imag };
+}
+exports.complexWithEvenIndex = complexWithEvenIndex;
+function complexWithOddIndex(complex) {
+    var len = Math.floor(complex.length / 4);
+    var real = new Float32Array(len);
+    var imag = new Float32Array(len);
+    for (var i = 2; i < complex.length; i += 4) {
+        real[Math.floor(i / 4)] = complex[i];
+        imag[Math.floor(i / 4)] = complex[i + 1];
+    }
+    return { real: real, imag: imag };
+}
+exports.complexWithOddIndex = complexWithOddIndex;
+function getComplexWithIndex(complex, index) {
+    var real = complex[index * 2];
+    var imag = complex[index * 2 + 1];
+    return { real: real, imag: imag };
+}
+exports.getComplexWithIndex = getComplexWithIndex;
+function assignToTypedArray(data, real, imag, index) {
+    data[index * 2] = real;
+    data[index * 2 + 1] = imag;
+}
+exports.assignToTypedArray = assignToTypedArray;
+function exponents(n) {
+    var real = new Float32Array(n / 2);
+    var imag = new Float32Array(n / 2);
+    for (var i = 0; i < Math.ceil(n / 2); i++) {
+        var x = -2 * Math.PI * (i / n);
+        real[i] = Math.cos(x);
+        imag[i] = Math.sin(x);
+    }
+    return { real: real, imag: imag };
+}
+exports.exponents = exponents;
+function exponent(k, n) {
+    var x = -2 * Math.PI * (k / n);
+    var real = Math.cos(x);
+    var imag = Math.sin(x);
+    return { real: real, imag: imag };
+}
+exports.exponent = exponent;
 
 },{}],72:[function(require,module,exports){
 "use strict";
@@ -13374,7 +13691,7 @@ function intersectionOverUnion(boxes, i, j) {
     return intersectionArea / (areaI + areaJ - intersectionArea);
 }
 
-},{"../ops/tensor_ops":162}],73:[function(require,module,exports){
+},{"../ops/tensor_ops":171}],73:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 function split(x, sizeSplits, axis) {
@@ -13424,7 +13741,7 @@ function topkImpl(x, xShape, xDtype, k, sorted) {
 }
 exports.topkImpl = topkImpl;
 
-},{"../ops/tensor_ops":162,"../util":185}],75:[function(require,module,exports){
+},{"../ops/tensor_ops":171,"../util":194}],75:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ArgMinMaxProgram = (function () {
@@ -13442,7 +13759,7 @@ var ArgMinMaxProgram = (function () {
         var indexSnippet = firstPass ?
             'inOffset + i;' :
             'round(getBestIndicesA(batch, inOffset + i));';
-        this.userCode = "\n      void main() {\n        ivec2 coords = getOutputCoords();\n        int batch = coords[0];\n        int outIdx = coords[1];\n        int inOffset = outIdx * " + windowSize + ";\n\n        int bestIndex = 0;\n        float bestValue = getA(batch, inOffset);\n\n        for (int i = 0; i < " + windowSize + "; i++) {\n          int inIdx = " + indexSnippet + ";\n          float candidate = getA(batch, inIdx);\n          if (candidate " + compOp + " bestValue) {\n            bestValue = candidate;\n            bestIndex = inIdx;\n          }\n        }\n        setOutput(float(bestIndex));\n      }\n    ";
+        this.userCode = "\n      void main() {\n        ivec2 coords = getOutputCoords();\n        int batch = coords[0];\n        int outIdx = coords[1];\n        int inOffset = outIdx * " + windowSize + ";\n\n        int bestIndex = inOffset;\n        float bestValue = getA(batch, bestIndex);\n\n        for (int i = 0; i < " + windowSize + "; i++) {\n          int inIdx = " + indexSnippet + ";\n          float candidate = getA(batch, inIdx);\n          if (candidate " + compOp + " bestValue) {\n            bestValue = candidate;\n            bestIndex = inIdx;\n          }\n        }\n        setOutput(float(bestIndex));\n      }\n    ";
     }
     return ArgMinMaxProgram;
 }());
@@ -13492,13 +13809,13 @@ var BatchNormProgram = (function () {
             scaleSnippet = 'getScaleAtOutCoords()';
         }
         this.outputShape = xShape;
-        this.userCode = "\n      void main() {\n        float x = getXAtOutCoords();\n        float mean = getMeanAtOutCoords();\n        float variance = getVarianceAtOutCoords();\n        float offset = " + offsetSnippet + ";\n        float scale = " + scaleSnippet + ";\n        float inv = scale * inversesqrt(variance + float(" + varianceEpsilon + "));\n        setOutput((x - mean) * inv + offset);\n      }\n    ";
+        this.userCode = "\n      void main() {\n        float x = getXAtOutCoords();\n        float mean = getMeanAtOutCoords();\n        float variance = getVarianceAtOutCoords();\n        float offset = " + offsetSnippet + ";\n        float scale = " + scaleSnippet + ";\n        float inv = scale * inversesqrt(variance + float(" + varianceEpsilon + "));\n        setOutput(dot(vec3(x, -mean, offset), vec3(inv, inv, 1)));\n      }\n    ";
     }
     return BatchNormProgram;
 }());
 exports.BatchNormProgram = BatchNormProgram;
 
-},{"../../ops/broadcast_util":130}],78:[function(require,module,exports){
+},{"../../ops/broadcast_util":134}],78:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var broadcast_util = require("../../ops/broadcast_util");
@@ -13518,7 +13835,7 @@ var BinaryOpComplexProgram = (function () {
 }());
 exports.BinaryOpComplexProgram = BinaryOpComplexProgram;
 
-},{"../../ops/broadcast_util":130}],79:[function(require,module,exports){
+},{"../../ops/broadcast_util":134}],79:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var broadcast_util = require("../../ops/broadcast_util");
@@ -13567,7 +13884,7 @@ var BinaryOpProgram = (function () {
 }());
 exports.BinaryOpProgram = BinaryOpProgram;
 
-},{"../../ops/broadcast_util":130}],80:[function(require,module,exports){
+},{"../../ops/broadcast_util":134}],80:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ClipProgram = (function () {
@@ -13596,7 +13913,7 @@ var ConcatProgram = (function () {
 }());
 exports.ConcatProgram = ConcatProgram;
 
-},{"../../ops/concat_util":134}],82:[function(require,module,exports){
+},{"../../ops/concat_util":138}],82:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var Conv2DDerFilterProgram = (function () {
@@ -13801,7 +14118,7 @@ function getFinalCoord(rank, name) {
     }
 }
 
-},{"./shader_compiler":113}],88:[function(require,module,exports){
+},{"./shader_compiler":117}],88:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var DepthToSpaceProgram = (function () {
@@ -13873,6 +14190,24 @@ exports.EncodeFloatProgram = EncodeFloatProgram;
 },{}],90:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.COMPLEX_FFT = {
+    REAL: 'return real * expR - imag * expI;',
+    IMAG: 'return real * expI + imag * expR;'
+};
+var FFTProgram = (function () {
+    function FFTProgram(op, inputShape) {
+        this.variableNames = ['real', 'imag'];
+        var size = inputShape[0];
+        this.outputShape = [size];
+        this.userCode = "\n      float unaryOpComplex(float real, float expR, float imag, float expI) {\n        " + op + "\n      }\n\n      float mulMatDFT(int row) {\n        // TODO: Gather constants in one place?\n        const float PI = 3.1415926535897932384626433832795;\n        float result = 0.0;\n\n        for (int i = 0; i < " + size + "; i++) {\n          float x = -2.0 * PI * float(row * i) / float(" + size + ");\n          float expR = cos(x);\n          float expI = sin(x);\n          float real = getReal(i);\n          float imag = getImag(i);\n\n          result += unaryOpComplex(real, expR, imag, expI);\n        }\n\n        return result;\n      }\n\n      void main() {\n        int row = getOutputCoords();\n        setOutput(mulMatDFT(row));\n      }\n    ";
+    }
+    return FFTProgram;
+}());
+exports.FFTProgram = FFTProgram;
+
+},{}],91:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 var FromPixelsProgram = (function () {
     function FromPixelsProgram(outputShape) {
         this.variableNames = ['A'];
@@ -13884,7 +14219,7 @@ var FromPixelsProgram = (function () {
 }());
 exports.FromPixelsProgram = FromPixelsProgram;
 
-},{}],91:[function(require,module,exports){
+},{}],92:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var shader_compiler_1 = require("./shader_compiler");
@@ -13923,7 +14258,26 @@ function getSourceCoords(aShape, axis) {
     return sourceCoords.join();
 }
 
-},{"./shader_compiler":113}],92:[function(require,module,exports){
+},{"./shader_compiler":117}],93:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var shader_compiler_1 = require("./shader_compiler");
+var GatherNDProgram = (function () {
+    function GatherNDProgram(sliceDim, strides, shape) {
+        this.sliceDim = sliceDim;
+        this.strides = strides;
+        this.variableNames = ['x', 'indices'];
+        this.outputShape = shape;
+        var stridesType = shader_compiler_1.getCoordsDataType(strides.length);
+        var dtype = shader_compiler_1.getCoordsDataType(shape.length);
+        var strideString = this.sliceDim > 1 ? 'strides[j]' : 'strides';
+        this.userCode = "\n        " + stridesType + " strides = " + stridesType + "(" + this.strides + ");\n         void main() {\n          " + dtype + " coords = getOutputCoords();\n          int flattenIndex = 0;\n          for (int j = 0; j < " + this.sliceDim + "; j++) {\n            int index = round(getIndices(coords[0], j));\n            flattenIndex += index * " + strideString + ";\n          }\n          setOutput(getX(flattenIndex, coords[1]));\n        }\n      ";
+    }
+    return GatherNDProgram;
+}());
+exports.GatherNDProgram = GatherNDProgram;
+
+},{"./shader_compiler":117}],94:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -14051,6 +14405,10 @@ var GPGPUContext = (function () {
         this.throwIfDisposed();
         gpgpu_util.uploadPixelDataToTexture(this.gl, texture, pixels);
     };
+    GPGPUContext.prototype.createFloat16PackedMatrixTexture = function (rows, columns) {
+        this.throwIfDisposed();
+        return gpgpu_util.createFloat16PackedMatrixTexture(this.gl, rows, columns, this.textureConfig);
+    };
     GPGPUContext.prototype.createPackedMatrixTexture = function (rows, columns) {
         this.throwIfDisposed();
         return gpgpu_util.createPackedMatrixTexture(this.gl, rows, columns, this.textureConfig);
@@ -14119,9 +14477,9 @@ var GPGPUContext = (function () {
         }
         return { query: query, isFencePassed: isFencePassed };
     };
-    GPGPUContext.prototype.downloadMatrixFromPackedTexture = function (texture, rows, columns) {
+    GPGPUContext.prototype.downloadMatrixFromPackedTexture = function (texture, shape, rows, columns) {
         var _this = this;
-        return this.downloadMatrixDriver(texture, function () { return gpgpu_util.downloadMatrixFromPackedOutputTexture(_this.gl, rows, columns, _this.textureConfig); });
+        return this.downloadMatrixDriver(texture, function () { return gpgpu_util.downloadMatrixFromPackedOutputTexture(_this.gl, shape[0], shape[1], rows, columns, _this.textureConfig); });
     };
     GPGPUContext.prototype.createProgram = function (fragmentShaderSource) {
         this.throwIfDisposed();
@@ -14403,7 +14761,7 @@ function binSearchLastTrue(arr) {
 }
 exports.binSearchLastTrue = binSearchLastTrue;
 
-},{"../../environment":51,"../../util":185,"./gpgpu_util":94,"./tex_util":116,"./webgl_util":122}],93:[function(require,module,exports){
+},{"../../environment":51,"../../util":194,"./gpgpu_util":96,"./tex_util":120,"./webgl_util":126}],95:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("../../util");
@@ -14525,7 +14883,7 @@ function makeShaderKey(program, inputs, output) {
 }
 exports.makeShaderKey = makeShaderKey;
 
-},{"../../util":185,"./shader_compiler":113,"./tex_util":116}],94:[function(require,module,exports){
+},{"../../util":194,"./shader_compiler":117,"./tex_util":120}],96:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../../environment");
@@ -14623,7 +14981,7 @@ function getTextureConfig(gl, textureHalfFloatExtension) {
 }
 exports.getTextureConfig = getTextureConfig;
 function createAndConfigureTexture(gl, width, height, internalFormat, textureFormat, textureType) {
-    webgl_util.validateTextureSize(gl, width, height);
+    webgl_util.validateTextureSize(width, height);
     var texture = webgl_util.createTexture(gl);
     var tex2d = gl.TEXTURE_2D;
     webgl_util.callAndCheck(gl, function () { return gl.bindTexture(tex2d, texture); });
@@ -14655,6 +15013,11 @@ function createPackedMatrixTexture(gl, rows, columns, textureConfig) {
     return createAndConfigureTexture(gl, width, height, textureConfig.internalFormatPackedFloat, gl.RGBA, gl.FLOAT);
 }
 exports.createPackedMatrixTexture = createPackedMatrixTexture;
+function createFloat16PackedMatrixTexture(gl, rows, columns, textureConfig) {
+    var _a = tex_util.getPackedMatrixTextureShapeWidthHeight(rows, columns), width = _a[0], height = _a[1];
+    return createAndConfigureTexture(gl, width, height, textureConfig.internalFormatHalfFloat, gl.RGBA, textureConfig.textureTypeHalfFloat);
+}
+exports.createFloat16PackedMatrixTexture = createFloat16PackedMatrixTexture;
 function bindVertexProgramAttributeStreams(gl, program, vertexBuffer) {
     var posOffset = 0;
     var uvOffset = 3 * 4;
@@ -14672,7 +15035,7 @@ function uploadPixelDataToTexture(gl, texture, pixels) {
 }
 exports.uploadPixelDataToTexture = uploadPixelDataToTexture;
 function uploadDataToTexture(gl, texture, width, height, data, textureFormat) {
-    webgl_util.validateTextureSize(gl, width, height);
+    webgl_util.validateTextureSize(width, height);
     webgl_util.callAndCheck(gl, function () { return gl.bindTexture(gl.TEXTURE_2D, texture); });
     webgl_util.callAndCheck(gl, function () { return gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, textureFormat, gl.FLOAT, data); });
     webgl_util.callAndCheck(gl, function () { return gl.bindTexture(gl.TEXTURE_2D, null); });
@@ -14743,16 +15106,32 @@ function downloadByteEncodedFloatMatrixFromOutputTexture(gl, rows, columns, text
     return new Float32Array(downloadTarget.buffer);
 }
 exports.downloadByteEncodedFloatMatrixFromOutputTexture = downloadByteEncodedFloatMatrixFromOutputTexture;
-function downloadMatrixFromPackedOutputTexture(gl, rows, columns, textureConfig) {
-    var _a = tex_util.getPackedMatrixTextureShapeWidthHeight(rows, columns), w = _a[0], h = _a[1];
-    var packedRGBA = new Float32Array(tex_util.getPackedRGBAArraySizeFromMatrixShape(rows, columns));
+function downloadMatrixFromPackedOutputTexture(gl, logicalRows, logicalCols, physicalRows, physicalCols, textureConfig) {
+    var _a = tex_util.getPackedMatrixTextureShapeWidthHeight(physicalRows, physicalCols), w = _a[0], h = _a[1];
+    var packedRGBA = new Float32Array(tex_util.getPackedRGBAArraySizeFromMatrixShape(physicalRows, physicalCols));
     webgl_util.callAndCheck(gl, function () { return gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, packedRGBA); });
-    var matrix = new Float32Array(rows * columns);
-    return tex_util.decodeMatrixFromPackedRGBA(packedRGBA, rows, columns, matrix);
+    var matrix = new Float32Array(logicalRows * logicalCols);
+    return tex_util.decodeMatrixFromPackedRGBA(packedRGBA, logicalRows, logicalCols, matrix);
 }
 exports.downloadMatrixFromPackedOutputTexture = downloadMatrixFromPackedOutputTexture;
 
-},{"../../environment":51,"./tex_util":116,"./webgl_util":122}],95:[function(require,module,exports){
+},{"../../environment":51,"./tex_util":120,"./webgl_util":126}],97:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var Im2ColProgram = (function () {
+    function Im2ColProgram(outputShape, inputShape, convInfo) {
+        this.variableNames = ['A'];
+        this.outputShape = outputShape;
+        var filterWidth = convInfo.filterWidth, inChannels = convInfo.inChannels, strideWidth = convInfo.strideWidth, strideHeight = convInfo.strideHeight, padInfo = convInfo.padInfo, outWidth = convInfo.outWidth, dilationWidth = convInfo.dilationWidth, dilationHeight = convInfo.dilationHeight;
+        var left = padInfo.left, top = padInfo.top;
+        var itemsPerBlockRow = inChannels * filterWidth;
+        this.userCode = "\n      void main() {\n        ivec2 rc = getOutputCoords();\n\n        vec4 result = vec4(0);\n\n        for(int row=0; row<=1; row++) {\n          for(int col=0; col<=1; col++) {\n            int blockIndex = rc.y + col;\n            int pos = rc.x + row;\n\n            if(blockIndex >= " + outputShape[1] + " || pos >= " + outputShape[0] + ") continue;\n\n            int offsetY = int(blockIndex / (" + outWidth + ")) * " + strideHeight + " - " + top + ";\n            int d0 = offsetY + " + dilationHeight + " * (pos / " + itemsPerBlockRow + ");\n\n            if(d0 >= " + inputShape[0] + " || d0 < 0) continue;\n\n            int offsetX = int(mod(float(blockIndex), " + outWidth + ".) * " + strideWidth + ". - " + left + ".);\n            int d1 = offsetX + " + dilationWidth + " * (int(mod(float(pos), " + itemsPerBlockRow + ".) / " + inChannels + ".));\n\n            if(d1 >= " + inputShape[1] + " || d1 < 0) continue;\n\n            result[row * 2 + col] = getA(d0, d1, int(mod(float(pos), " + inChannels + ".)));\n          }\n        }\n\n        gl_FragColor = result;\n      }\n    ";
+    }
+    return Im2ColProgram;
+}());
+exports.Im2ColProgram = Im2ColProgram;
+
+},{}],98:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var LRNProgram = (function () {
@@ -14779,7 +15158,7 @@ var LRNProgram = (function () {
 }());
 exports.LRNProgram = LRNProgram;
 
-},{}],96:[function(require,module,exports){
+},{}],99:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var LRNGradProgram = (function () {
@@ -14798,7 +15177,7 @@ var LRNGradProgram = (function () {
 }());
 exports.LRNGradProgram = LRNGradProgram;
 
-},{}],97:[function(require,module,exports){
+},{}],100:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var MaxPool2DBackpropProgram = (function () {
@@ -14818,7 +15197,7 @@ var MaxPool2DBackpropProgram = (function () {
 }());
 exports.MaxPool2DBackpropProgram = MaxPool2DBackpropProgram;
 
-},{}],98:[function(require,module,exports){
+},{}],101:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var MatMulProgram = (function () {
@@ -14847,7 +15226,7 @@ var MatMulProgram = (function () {
 }());
 exports.MatMulProgram = MatMulProgram;
 
-},{}],99:[function(require,module,exports){
+},{}],102:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var MatMulPackedProgram = (function () {
@@ -14858,17 +15237,17 @@ var MatMulPackedProgram = (function () {
         this.outputShape = outputShape;
         var sharedDim = transposeA ? aShape[0] : aShape[1];
         var sharedDimensionPacked = Math.ceil(sharedDim / 2);
-        var aSample = transposeA ? 'resultUV.t, center' : 'center, resultUV.t';
-        var bSample = transposeB ? 'center, resultUV.s' : 'resultUV.s, center';
+        var aSample = transposeA ? 'i * 2, rc.x' : 'rc.x, i * 2';
+        var bSample = transposeB ? 'rc.y, i * 2' : 'i * 2, rc.y';
         var aSwizzle = transposeA ? ['a.xxyy', 'a.zzww'] : ['a.xxzz', 'a.yyww'];
         var bSwizzle = transposeB ? ['b.xzxz', 'b.ywyw'] : ['b.xyxy', 'b.zwzw'];
-        this.userCode = "\n      const float sharedDimension = " + sharedDimensionPacked + ".0;\n\n      vec4 dot2x2ARowBCol() {\n        vec4 result = vec4(0);\n        for (int ii = 0; ii < " + sharedDimensionPacked + "; ii++) {\n          float i = float(ii);\n          float center = (i + 0.5) / sharedDimension;\n          vec4 a = texture2D(matrixA, vec2(" + aSample + "));\n          vec4 b = texture2D(matrixB, vec2(" + bSample + "));\n\n          result += (" + aSwizzle[0] + " * " + bSwizzle[0] + ") + (" + aSwizzle[1] + " * " + bSwizzle[1] + ");\n        }\n        return result;\n      }\n\n      void main() {\n        gl_FragColor = dot2x2ARowBCol();\n      }\n    ";
+        this.userCode = "\n      const float sharedDimension = " + sharedDimensionPacked + ".0;\n\n      vec4 dot2x2ARowBCol(ivec2 rc) {\n        vec4 result = vec4(0);\n        for (int i = 0; i < " + sharedDimensionPacked + "; i++) {\n          vec4 a = getMatrixA(" + aSample + ");\n          vec4 b = getMatrixB(" + bSample + ");\n\n          result += (" + aSwizzle[0] + " * " + bSwizzle[0] + ") + (" + aSwizzle[1] + " * " + bSwizzle[1] + ");\n        }\n        return result;\n      }\n\n      void main() {\n        ivec2 rc = getOutputCoords();\n        gl_FragColor = dot2x2ARowBCol(rc);\n      }\n    ";
     }
     return MatMulPackedProgram;
 }());
 exports.MatMulPackedProgram = MatMulPackedProgram;
 
-},{}],100:[function(require,module,exports){
+},{}],103:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var MultinomialProgram = (function () {
@@ -14890,7 +15269,7 @@ var MultinomialProgram = (function () {
 }());
 exports.MultinomialProgram = MultinomialProgram;
 
-},{}],101:[function(require,module,exports){
+},{}],104:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var OneHotProgram = (function () {
@@ -14903,20 +15282,20 @@ var OneHotProgram = (function () {
 }());
 exports.OneHotProgram = OneHotProgram;
 
-},{}],102:[function(require,module,exports){
+},{}],105:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var PackProgram = (function () {
     function PackProgram(outputShape) {
         this.variableNames = ['A'];
         this.outputShape = outputShape;
-        this.userCode = "\n      void main() {\n        ivec2 rc = getOutputCoords();\n\n        int r = rc.x;\n        int c = rc.y;\n        int rp1 = r + 1;\n        int cp1 = c + 1;\n\n        bool cEdge = cp1 >= " + outputShape[1] + ";\n        bool rEdge = rp1 >= " + outputShape[0] + ";\n\n        gl_FragColor = vec4(\n            getA(r, c),\n            cEdge ? 0. : getA(r, cp1),\n            rEdge ? 0. : getA(rp1, c),\n            rEdge || cEdge ? 0. : getA(rp1, cp1)\n          );\n      }\n    ";
+        this.userCode = "\n      void main() {\n        ivec2 rc = getOutputCoords();\n\n        int r = rc.x;\n        int c = rc.y;\n\n        if(r >= " + outputShape[0] + " || c >= " + outputShape[1] + ") {\n          gl_FragColor = vec4(0);\n        } else {\n          int rp1 = r + 1;\n          int cp1 = c + 1;\n\n          bool cEdge = cp1 >= " + outputShape[1] + ";\n          bool rEdge = rp1 >= " + outputShape[0] + ";\n\n          gl_FragColor = vec4(\n              getA(r, c),\n              cEdge ? 0. : getA(r, cp1),\n              rEdge ? 0. : getA(rp1, c),\n              rEdge || cEdge ? 0. : getA(rp1, cp1)\n            );\n        }\n      }\n    ";
     }
     return PackProgram;
 }());
 exports.PackProgram = PackProgram;
 
-},{}],103:[function(require,module,exports){
+},{}],106:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var shader_compiler_1 = require("./shader_compiler");
@@ -14939,7 +15318,7 @@ var PadProgram = (function () {
 }());
 exports.PadProgram = PadProgram;
 
-},{"./shader_compiler":113}],104:[function(require,module,exports){
+},{"./shader_compiler":117}],107:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var Pool2DProgram = (function () {
@@ -14980,7 +15359,7 @@ var Pool2DProgram = (function () {
 }());
 exports.Pool2DProgram = Pool2DProgram;
 
-},{}],105:[function(require,module,exports){
+},{}],108:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ReduceProgram = (function () {
@@ -14993,7 +15372,10 @@ var ReduceProgram = (function () {
         this.outputShape = [batchSize, outSize];
         var initializationValue = '0.0';
         var compareOp = "";
-        if (reduceType === 'min') {
+        if (reduceType === 'prod') {
+            initializationValue = '1.0';
+        }
+        else if (reduceType === 'min') {
             initializationValue = '1.0 / 0.0';
             compareOp = "min";
         }
@@ -15006,6 +15388,9 @@ var ReduceProgram = (function () {
         if (reduceType === 'sum') {
             returnValue = "sumValue";
         }
+        else if (reduceType === 'prod') {
+            returnValue = "prodValue";
+        }
         else if (reduceType === 'all') {
             returnValue = "allValue";
         }
@@ -15014,7 +15399,7 @@ var ReduceProgram = (function () {
         }
         var windowSizeNearestVec4 = Math.floor(windowSize / 4) * 4;
         var windowSizeVec4Remainder = windowSize % 4;
-        var updateSnippet = "\n      if (" + (reduceType === 'sum') + ") {\n        sumValue += dot(values, ones);\n      } else {\n        minMaxValue = " + compareOp + "(values, minMaxValue);\n      }\n    ";
+        var updateSnippet = "\n      if (" + (reduceType === 'sum') + ") {\n        sumValue += dot(values, ones);\n      } else if (" + (reduceType === 'prod') + ") {\n        vec2 tmp = vec2(values[0], values[1]) * vec2(values[2], values[3]);\n        prodValue *= tmp[0] * tmp[1];\n      } else {\n        minMaxValue = " + compareOp + "(values, minMaxValue);\n      }\n    ";
         var vecType = "vec4";
         if (reduceType === 'all') {
             initializationValue = '1.0';
@@ -15030,13 +15415,13 @@ var ReduceProgram = (function () {
         if (inSize % windowSize > 0) {
             checkOutOfBounds = "\n        if (inIdx < 0 || inIdx >= " + inSize + ") {\n          return initializationValue;\n        }\n      ";
         }
-        this.userCode = "\n      const float initializationValue = " + initializationValue + ";\n      const vec4 ones = vec4(1.0, 1.0, 1.0, 1.0);\n\n      float getValue(int batch, int inIdx) {\n        " + checkOutOfBounds + "\n        return getX(batch, inIdx);\n      }\n\n      void main() {\n        ivec2 coords = getOutputCoords();\n        int batch = coords[0];\n        int outIdx = coords[1];\n        int inOffset = outIdx * " + windowSize + ";\n\n        vec4 minMaxValue = vec4(" + initializationValue + ");\n        float sumValue = 0.0;\n        float allValue = 1.0;\n        float anyValue = 0.0;\n\n        for (int i = 0; i < " + windowSizeNearestVec4 + "; i += 4) {\n          int inIdx = inOffset + i;\n          " + vecType + " values = " + vecType + "(\n            getValue(batch, inIdx),\n            getValue(batch, inIdx + 1),\n            getValue(batch, inIdx + 2),\n            getValue(batch, inIdx + 3)\n          );\n\n          " + updateSnippet + "\n        }\n\n        int inIdx = inOffset + " + windowSizeNearestVec4 + ";\n        if (" + (windowSizeVec4Remainder === 1) + ") {\n          " + vecType + " values = " + vecType + "(\n            getValue(batch, inIdx),\n            initializationValue,\n            initializationValue,\n            initializationValue\n          );\n\n          " + updateSnippet + "\n        } else if (" + (windowSizeVec4Remainder === 2) + ") {\n          " + vecType + " values = " + vecType + "(\n            getValue(batch, inIdx),\n            getValue(batch, inIdx + 1),\n            initializationValue,\n            initializationValue\n          );\n\n          " + updateSnippet + "\n        } else if (" + (windowSizeVec4Remainder === 3) + ") {\n          " + vecType + " values = " + vecType + "(\n            getValue(batch, inIdx),\n            getValue(batch, inIdx + 1),\n            getValue(batch, inIdx + 2),\n            initializationValue\n          );\n\n          " + updateSnippet + "\n        }\n        setOutput(" + returnValue + ");\n      }\n    ";
+        this.userCode = "\n      const float initializationValue = " + initializationValue + ";\n      const vec4 ones = vec4(1.0, 1.0, 1.0, 1.0);\n\n      float getValue(int batch, int inIdx) {\n        " + checkOutOfBounds + "\n        return getX(batch, inIdx);\n      }\n\n      void main() {\n        ivec2 coords = getOutputCoords();\n        int batch = coords[0];\n        int outIdx = coords[1];\n        int inOffset = outIdx * " + windowSize + ";\n\n        vec4 minMaxValue = vec4(" + initializationValue + ");\n        float prodValue = 1.0;\n        float sumValue = 0.0;\n        float allValue = 1.0;\n        float anyValue = 0.0;\n\n        for (int i = 0; i < " + windowSizeNearestVec4 + "; i += 4) {\n          int inIdx = inOffset + i;\n          " + vecType + " values = " + vecType + "(\n            getValue(batch, inIdx),\n            getValue(batch, inIdx + 1),\n            getValue(batch, inIdx + 2),\n            getValue(batch, inIdx + 3)\n          );\n\n          " + updateSnippet + "\n        }\n\n        int inIdx = inOffset + " + windowSizeNearestVec4 + ";\n        if (" + (windowSizeVec4Remainder === 1) + ") {\n          " + vecType + " values = " + vecType + "(\n            getValue(batch, inIdx),\n            initializationValue,\n            initializationValue,\n            initializationValue\n          );\n\n          " + updateSnippet + "\n        } else if (" + (windowSizeVec4Remainder === 2) + ") {\n          " + vecType + " values = " + vecType + "(\n            getValue(batch, inIdx),\n            getValue(batch, inIdx + 1),\n            initializationValue,\n            initializationValue\n          );\n\n          " + updateSnippet + "\n        } else if (" + (windowSizeVec4Remainder === 3) + ") {\n          " + vecType + " values = " + vecType + "(\n            getValue(batch, inIdx),\n            getValue(batch, inIdx + 1),\n            getValue(batch, inIdx + 2),\n            initializationValue\n          );\n\n          " + updateSnippet + "\n        }\n        setOutput(" + returnValue + ");\n      }\n    ";
     }
     return ReduceProgram;
 }());
 exports.ReduceProgram = ReduceProgram;
 
-},{}],106:[function(require,module,exports){
+},{}],109:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ResizeBilinearBackpropProgram = (function () {
@@ -15066,7 +15451,7 @@ var ResizeBilinearBackpropProgram = (function () {
 }());
 exports.ResizeBilinearBackpropProgram = ResizeBilinearBackpropProgram;
 
-},{}],107:[function(require,module,exports){
+},{}],110:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ResizeBilinearProgram = (function () {
@@ -15089,7 +15474,7 @@ var ResizeBilinearProgram = (function () {
 }());
 exports.ResizeBilinearProgram = ResizeBilinearProgram;
 
-},{}],108:[function(require,module,exports){
+},{}],111:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ResizeNearestNeigborBackpropProgram = (function () {
@@ -15119,7 +15504,7 @@ var ResizeNearestNeigborBackpropProgram = (function () {
 }());
 exports.ResizeNearestNeigborBackpropProgram = ResizeNearestNeigborBackpropProgram;
 
-},{}],109:[function(require,module,exports){
+},{}],112:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var ResizeNearestNeighborProgram = (function () {
@@ -15143,7 +15528,7 @@ var ResizeNearestNeighborProgram = (function () {
 }());
 exports.ResizeNearestNeighborProgram = ResizeNearestNeighborProgram;
 
-},{}],110:[function(require,module,exports){
+},{}],113:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var shader_compiler_1 = require("./shader_compiler");
@@ -15173,7 +15558,27 @@ var ReverseProgram = (function () {
 }());
 exports.ReverseProgram = ReverseProgram;
 
-},{"./shader_compiler":113}],111:[function(require,module,exports){
+},{"./shader_compiler":117}],114:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var shader_compiler_1 = require("./shader_compiler");
+var ScatterNDProgram = (function () {
+    function ScatterNDProgram(updateSize, sliceDim, strides, shape) {
+        this.updateSize = updateSize;
+        this.sliceDim = sliceDim;
+        this.strides = strides;
+        this.variableNames = ['updates', 'indices'];
+        this.outputShape = shape;
+        var stridesType = shader_compiler_1.getCoordsDataType(strides.length);
+        var dtype = shader_compiler_1.getCoordsDataType(shape.length);
+        var strideString = this.sliceDim > 1 ? 'strides[j]' : 'strides';
+        this.userCode = "\n        " + stridesType + " strides = " + stridesType + "(" + this.strides + ");\n\n        void main() {\n          " + dtype + " coords = getOutputCoords();\n          float sum = 0.0;\n          for (int i = 0; i < " + this.updateSize + "; i++) {\n            int flattenIndex = 0;\n            for (int j = 0; j < " + this.sliceDim + "; j++) {\n              int index = round(getIndices(i, j));\n              flattenIndex += index * " + strideString + ";\n            }\n            if (flattenIndex == coords[0]) {\n              sum += getUpdates(i, coords[1]);\n            }\n          }\n          setOutput(sum);\n        }\n      ";
+    }
+    return ScatterNDProgram;
+}());
+exports.ScatterNDProgram = ScatterNDProgram;
+
+},{"./shader_compiler":117}],115:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var SegmentOpProgram = (function () {
@@ -15204,7 +15609,7 @@ var SegmentOpProgram = (function () {
 }());
 exports.SegmentOpProgram = SegmentOpProgram;
 
-},{}],112:[function(require,module,exports){
+},{}],116:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var shader_compiler_1 = require("./shader_compiler");
@@ -15241,7 +15646,7 @@ var SelectProgram = (function () {
 }());
 exports.SelectProgram = SelectProgram;
 
-},{"./shader_compiler":113}],113:[function(require,module,exports){
+},{"./shader_compiler":117}],117:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var broadcast_util = require("../../ops/broadcast_util");
@@ -15297,9 +15702,24 @@ function getSamplerFromInInfo(inInfo) {
                 " is not yet supported");
     }
 }
+function getPackedSamplerFromInInfo(inInfo) {
+    var shape = inInfo.shapeInfo.logicalShape;
+    switch (shape.length) {
+        case 2:
+            return getPackedSampler2D(inInfo);
+        default:
+            throw new Error("Packed " + shape.length + "-D input sampling" +
+                " is not yet supported");
+    }
+}
 function getInputSamplingSnippet(inInfo, outShapeInfo, broadcast) {
     var res = getSamplerFlat(inInfo);
-    res += getSamplerFromInInfo(inInfo);
+    if (inInfo.shapeInfo.isPacked) {
+        res += getPackedSamplerFromInInfo(inInfo);
+    }
+    else {
+        res += getSamplerFromInInfo(inInfo);
+    }
     if (broadcast ||
         util.arraysEqual(inInfo.shapeInfo.logicalShape, outShapeInfo.logicalShape)) {
         res += getSamplerAtOutputCoords(inInfo, outShapeInfo, broadcast);
@@ -15337,7 +15757,7 @@ function getOutputSamplingSnippet(outShape, outTexShape) {
     }
 }
 var SAMPLE_1D_SNIPPET = "\nvec2 UVfrom1D(int texNumR, int texNumC, int index) {\n  int texR = index / texNumC;\n  int texC = index - texR * texNumC;\n  return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);\n}\n";
-var SAMPLE_2D_SNIPPET = "\nvec2 UVfrom2D(int texNumR, int texNumC, int numC, int row, int col) {\n  int index = row * numC + col;\n  int texR = index / texNumC;\n  int texC = index - texR * texNumC;\n  return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);\n}\n";
+var SAMPLE_2D_SNIPPET = "\nvec2 UVfrom2D(int texNumR, int texNumC, int numC, int row, int col) {\n  int index = row * numC + col;\n  int texR = index / texNumC;\n  int texC = index - texR * texNumC;\n  return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);\n}\nvec2 packedUVfrom2D(int texelsInLogicalRow, int texNumR,\n  int texNumC, int row, int col) {\n  int texelIndex = (row / 2) * texelsInLogicalRow + (col / 2);\n  int texR = texelIndex / texNumC;\n  int texC = texelIndex - texR * texNumC;\n  return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);\n}\n";
 var SAMPLE_3D_SNIPPET = "\nvec2 UVfrom3D(int texNumR, int texNumC, int stride0,\n    int stride1, int row, int col, int depth) {\n  // Explicitly use integer operations as dot() only works on floats.\n  int index = row * stride0 + col * stride1 + depth;\n  int texR = index / texNumC;\n  int texC = index - texR * texNumC;\n  return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);\n}\n";
 var SAMPLE_4D_SNIPPET = "\nvec2 UVfrom4D(int texNumR, int texNumC, int stride0,\n    int stride1, int stride2, int row, int col, int depth,\n    int depth2) {\n  // Explicitly use integer operations as dot() only works on floats.\n  int index = row * stride0 + col * stride1 + depth * stride2 + depth2;\n  int texR = index / texNumC;\n  int texC = index - texR * texNumC;\n  return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);\n}\n";
 var SAMPLE_5D_SNIPPET = "\nvec2 UVfrom5D(int texNumR, int texNumC, int stride0,\n    int stride1, int stride2, int stride3, int row, int col, int depth,\n    int depth2, int depth3) {\n  // Explicitly use integer operations as dot() only works on floats.\n  int index = row * stride0 + col * stride1 +\n              depth * stride2 + depth2 * stride3 + depth3;\n  int texR = index / texNumC;\n  int texC = index - texR * texNumC;\n  return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);\n}\n";
@@ -15384,7 +15804,12 @@ function getOutput6DCoords(shape, texShape) {
     return "\n    ivec6 getOutputCoords() {\n      ivec2 resTexRC = ivec2(resultUV.yx *\n        vec2(" + texShape[0] + ", " + texShape[1] + "));\n      int index = resTexRC.x * " + texShape[1] + " + resTexRC.y;\n\n      int r = index / " + stride0 + ";\n      index -= r * " + stride0 + ";\n\n      int c = index / " + stride1 + ";\n      index -= c * " + stride1 + ";\n\n      int d = index / " + stride2 + ";\n      index -= d * " + stride2 + ";\n\n      int d2 = index / " + stride3 + ";\n      index -= d2 * " + stride3 + ";\n\n      int d3 = index / " + stride4 + ";\n      int d4 = index - d3 * " + stride4 + ";\n\n      ivec6 result = ivec6(r, c, d, d2, d3, d4);\n      return result;\n    }\n  ";
 }
 function getOutputPacked2DCoords(shape, texShape) {
-    return "\n    ivec2 getOutputCoords() {\n      return 2 * ivec2(resultUV.yx * vec2(" + Math.ceil(texShape[0] / 2) + ", " + Math.ceil(texShape[1] / 2) + "));\n    }\n  ";
+    var packedTexShape = [Math.ceil(texShape[0] / 2), Math.ceil(texShape[1] / 2)];
+    if (util.arraysEqual(shape, texShape)) {
+        return "\n      ivec2 getOutputCoords() {\n        return 2 * ivec2(resultUV.yx * vec2(" + packedTexShape[0] + ", " + packedTexShape[1] + "));\n      }\n    ";
+    }
+    var texelsInLogicalRow = Math.ceil(shape[1] / 2);
+    return "\n    ivec2 getOutputCoords() {\n      ivec2 resTexRC = ivec2(resultUV.yx *\n                             vec2(" + packedTexShape[0] + ", " + packedTexShape[1] + "));\n\n      int index = resTexRC.x * " + packedTexShape[1] + " + resTexRC.y;\n      int r = 2 * (index / " + texelsInLogicalRow + ");\n      int c = imod(index, " + texelsInLogicalRow + ") * 2;\n\n      return ivec2(r, c);\n    }\n  ";
 }
 function getOutput2DCoords(shape, texShape) {
     if (util.arraysEqual(shape, texShape)) {
@@ -15411,6 +15836,20 @@ function getSampler1D(inputInfo) {
     var funcName = 'get' + texName.charAt(0).toUpperCase() + texName.slice(1);
     return "\n    float " + funcName + "(int index) {\n      return " + funcName + "Flat(index);\n    }\n  ";
 }
+function getPackedSampler2D(inputInfo) {
+    var shape = inputInfo.shapeInfo.logicalShape;
+    var texName = inputInfo.name;
+    var funcName = 'get' + texName.charAt(0).toUpperCase() + texName.slice(1);
+    var texShape = inputInfo.shapeInfo.texShape;
+    var texNumR = texShape[0];
+    var texNumC = texShape[1];
+    if (texShape != null && util.arraysEqual(shape, texShape)) {
+        return "\n      vec4 " + funcName + "(int row, int col) {\n        vec2 uv = (vec2(col, row) + halfCR) / vec2(" + texNumC + ".0, " + texNumR + ".0);\n\n        return texture2D(" + texName + ", uv);\n      }\n    ";
+    }
+    var packedTexShape = [Math.ceil(texShape[0] / 2), Math.ceil(texShape[1] / 2)];
+    var valuesPerRow = Math.ceil(shape[1] / 2);
+    return "\n    vec4 " + funcName + "(int row, int col) {\n      vec2 uv = packedUVfrom2D(" + valuesPerRow + ", " + packedTexShape[0] + ", " + packedTexShape[1] + ", row, col);\n      return texture2D(" + texName + ", uv);\n    }\n  ";
+}
 function getSampler2D(inputInfo) {
     var shape = inputInfo.shapeInfo.logicalShape;
     var texName = inputInfo.name;
@@ -15429,15 +15868,15 @@ function getSampler2D(inputInfo) {
         return "\n      " + getSamplerFromInInfo(newInputInfo) + "\n      float " + funcName + "(int row, int col) {\n        return " + funcName + "(" + getSqueezedParams(params, keptDims) + ");\n      }\n    ";
     }
     if (inputInfo.shapeInfo.isUniform) {
-        return "\n      float " + funcName + "(int row, int col) {\n        int index = row * " + shape[1] + " + col;\n        return " + funcName + "Flat(index);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col) {\n        float index = dot(vec2(row, col), vec2(" + shape[1] + ", 1));\n        return " + funcName + "Flat(round(index));\n      }\n    ";
     }
     var texNumR = texShape[0];
     var texNumC = texShape[1];
     if (texNumC === 1) {
-        return "\n    float " + funcName + "(int row, int col) {\n      int index = row * " + shape[1] + " + col;\n      vec2 uv = vec2(0.5, (float(index) + 0.5) / " + texNumR + ".0);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
+        return "\n    float " + funcName + "(int row, int col) {\n      float index = dot(vec2(row, col), vec2(" + shape[1] + ", 1));\n      vec2 uv = vec2(0.5, (index + 0.5) / " + texNumR + ".0);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
     }
     if (texNumR === 1) {
-        return "\n    float " + funcName + "(int row, int col) {\n      int index = row * " + shape[1] + " + col;\n      vec2 uv = vec2((float(index) + 0.5) / " + texNumC + ".0, 0.5);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
+        return "\n    float " + funcName + "(int row, int col) {\n      float index = dot(vec2(row, col), vec2(" + shape[1] + ", 1));\n      vec2 uv = vec2((index + 0.5) / " + texNumC + ".0, 0.5);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
     }
     return "\n  float " + funcName + "(int row, int col) {\n    vec2 uv = UVfrom2D(" + texNumR + ", " + texNumC + ", " + shape[1] + ", row, col);\n    return sampleTexture(" + texName + ", uv);\n  }\n";
 }
@@ -15455,16 +15894,16 @@ function getSampler3D(inputInfo) {
         return "\n        " + getSamplerFromInInfo(newInputInfo) + "\n        float " + funcName + "(int row, int col, int depth) {\n          return " + funcName + "(" + getSqueezedParams(params, keptDims) + ");\n        }\n      ";
     }
     if (inputInfo.shapeInfo.isUniform) {
-        return "\n      float " + funcName + "(int row, int col, int depth) {\n        int index = row * " + stride0 + " + col * " + stride1 + " + depth;\n        return " + funcName + "Flat(index);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth) {\n        float index = dot(vec3(row, col, depth),\n                          vec3(" + stride0 + ", " + stride1 + ", 1));\n        return " + funcName + "Flat(round(index));\n      }\n    ";
     }
     var texShape = inputInfo.shapeInfo.texShape;
     var texNumR = texShape[0];
     var texNumC = texShape[1];
     if (texNumC === stride0) {
-        return "\n        float " + funcName + "(int row, int col, int depth) {\n          int texR = row;\n          int texC = col * " + stride1 + " + depth;\n          vec2 uv = (vec2(texC, texR) + halfCR) /\n                     vec2(" + texNumC + ".0, " + texNumR + ".0);\n          return sampleTexture(" + texName + ", uv);\n        }\n      ";
+        return "\n        float " + funcName + "(int row, int col, int depth) {\n          float texR = float(row);\n          float texC = dot(vec2(col, depth), vec2(" + stride1 + ", 1));\n          vec2 uv = (vec2(texC, texR) + halfCR) /\n                     vec2(" + texNumC + ".0, " + texNumR + ".0);\n          return sampleTexture(" + texName + ", uv);\n        }\n      ";
     }
     if (texNumC === stride1) {
-        return "\n    float " + funcName + "(int row, int col, int depth) {\n      int texR = row * " + shape[1] + " + col;\n      int texC = depth;\n      vec2 uv = (vec2(texC, texR) + halfCR) / vec2(" + texNumC + ".0, " + texNumR + ".0);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
+        return "\n    float " + funcName + "(int row, int col, int depth) {\n      float texR = dot(vec2(row, col), vec2(" + shape[1] + ", 1));\n      float texC = float(depth);\n      vec2 uv = (vec2(texC, texR) + halfCR) / vec2(" + texNumC + ".0, " + texNumR + ".0);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
     }
     return "\n      float " + funcName + "(int row, int col, int depth) {\n        vec2 uv = UVfrom3D(\n            " + texNumR + ", " + texNumC + ", " + stride0 + ", " + stride1 + ", row, col, depth);\n        return sampleTexture(" + texName + ", uv);\n      }\n  ";
 }
@@ -15482,16 +15921,16 @@ function getSampler4D(inputInfo) {
         return "\n      " + getSamplerFromInInfo(newInputInfo) + "\n      float " + funcName + "(int row, int col, int depth, int depth2) {\n        return " + funcName + "(" + getSqueezedParams(params, keptDims) + ");\n      }\n    ";
     }
     if (inputInfo.shapeInfo.isUniform) {
-        return "\n      float " + funcName + "(int row, int col, int depth, int depth2) {\n        int index = row * " + stride0 + " + col * " + stride1 + " +\n            depth * " + stride2 + " + depth2;\n        return " + funcName + "Flat(index);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth, int depth2) {\n        float index = dot(vec4(row, col, depth, depth2),\n                          vec4(" + stride0 + ", " + stride1 + ", " + stride2 + ", 1));\n        return " + funcName + "Flat(round(index));\n      }\n    ";
     }
     var texShape = inputInfo.shapeInfo.texShape;
     var texNumR = texShape[0];
     var texNumC = texShape[1];
     if (texNumC === stride0) {
-        return "\n      float " + funcName + "(int row, int col, int depth, int depth2) {\n        int texR = row;\n        int texC = col * " + stride1 + " + depth * " + stride2 + " + depth2;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                   vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth, int depth2) {\n        float texR = float(row);\n        float texC =\n            dot(vec3(col, depth, depth2), vec3(" + stride1 + ", " + stride2 + ", 1));\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                   vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
     }
     if (texNumC === stride2) {
-        return "\n      float " + funcName + "(int row, int col, int depth, int depth2) {\n        int texR = row * " + shape[1] * shape[2] + " + col * " + shape[2] + " + depth;\n        int texC = depth2;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                  vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth, int depth2) {\n        float texR = dot(vec3(row, col, depth),\n                         vec3(" + shape[1] * shape[2] + ", " + shape[2] + ", 1));\n        float texC = float(depth2);\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                  vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
     }
     return "\n    float " + funcName + "(int row, int col, int depth, int depth2) {\n      vec2 uv = UVfrom4D(" + texNumR + ", " + texNumC + ", " + stride0 + ", " + stride1 + ",\n          " + stride2 + ", row, col, depth, depth2);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
 }
@@ -15510,16 +15949,16 @@ function getSampler5D(inputInfo) {
         return "\n      " + getSamplerFromInInfo(newInputInfo) + "\n      float " + funcName + "(int row, int col, int depth, int depth2, int depth3) {\n        return " + funcName + "(" + getSqueezedParams(params, keptDims) + ");\n      }\n    ";
     }
     if (inputInfo.shapeInfo.isUniform) {
-        return "\n      float " + funcName + "(int row, int col, int depth, int depth2, int depth3) {\n        int index = row * " + stride0 + " + col * " + stride1 + " +\n            depth * " + stride2 + " + depth2 * " + stride3 + " + depth3;\n        return " + funcName + "Flat(index);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth, int depth2, int depth3) {\n        float index = dot(\n          vec4(row, col, depth, depth2),\n          vec4(" + stride0 + ", " + stride1 + ", " + stride2 + ", " + stride3 + ")) +\n          depth3;\n        return " + funcName + "Flat(index);\n      }\n    ";
     }
     var texShape = inputInfo.shapeInfo.texShape;
     var texNumR = texShape[0];
     var texNumC = texShape[1];
     if (texNumC === stride0) {
-        return "\n      float " + funcName + "(int row, int col, int depth, int depth2, int depth3) {\n        int texR = row;\n        int texC = col * " + stride1 + " + depth * " + stride2 + " +\n                   depth2 * " + stride3 + " + depth3;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                   vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth, int depth2, int depth3) {\n        int texR = row;\n        float texC = dot(\n          vec4(col, depth, depth2, depth3),\n          vec4(" + stride1 + ", " + stride2 + ", " + stride3 + ", 1));\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                   vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
     }
     if (texNumC === stride3) {
-        return "\n      float " + funcName + "(int row, int col, int depth, int depth2, int depth3) {\n        int texR = row * " + shape[1] * shape[2] + " + col * " + shape[2] + " +\n                   depth * " + shape[3] + " + depth2;\n        int texC = depth3;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                  vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth, int depth2, int depth3) {\n        float texR = dot(\n          vec4(row, col, depth, depth2),\n          vec4(" + shape[1] * shape[2] * shape[3] + ", " + shape[2] * shape[3] + ",\n            " + shape[3] + ", 1));\n        int texC = depth3;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                  vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
     }
     return "\n    float " + funcName + "(int row, int col, int depth, int depth2, int depth3) {\n      vec2 uv = UVfrom5D(" + texNumR + ", " + texNumC + ", " + stride0 + ", " + stride1 + ",\n          " + stride2 + ", " + stride3 + ", row, col, depth, depth2, depth3);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
 }
@@ -15539,16 +15978,16 @@ function getSampler6D(inputInfo) {
         return "\n      " + getSamplerFromInInfo(newInputInfo) + "\n      float " + funcName + "(int row, int col, int depth,\n                    int depth2, int depth3, int depth4) {\n        return " + funcName + "(" + getSqueezedParams(params, keptDims) + ");\n      }\n    ";
     }
     if (inputInfo.shapeInfo.isUniform) {
-        return "\n      float " + funcName + "(int row, int col, int depth,\n                  int depth2, int depth3, int depth4) {\n        int index = row * " + stride0 + " + col * " + stride1 + " +\n            depth * " + stride2 + " + depth2 * " + stride3 + " + depth3 * " + stride3 + "\n            + depth4\n        return " + funcName + "Flat(index);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth,\n                  int depth2, int depth3, int depth4) {\n        float index = dot(\n          vec4(row, col, depth, depth2),\n          vec4(" + stride0 + ", " + stride1 + ", " + stride2 + ", " + stride3 + ")) +\n          dot(\n            vec2(depth3, depth4),\n            vec2(" + stride4 + ", 1));\n        return " + funcName + "Flat(index);\n      }\n    ";
     }
     var texShape = inputInfo.shapeInfo.texShape;
     var texNumR = texShape[0];
     var texNumC = texShape[1];
     if (texNumC === stride0) {
-        return "\n      float " + funcName + "(int row, int col, int depth,\n                    int depth2, int depth3, int depth4) {\n        int texR = row;\n        int texC = col * " + stride1 + " + depth * " + stride2 + " + depth2;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                   vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth,\n                    int depth2, int depth3, int depth4) {\n        int texR = row;\n        float texC = dot(\n          vec4(col, depth, depth2, depth3),\n          vec4(" + stride1 + ", " + stride2 + ", " + stride3 + ", " + stride4 + ")) + depth4;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                   vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
     }
     if (texNumC === stride4) {
-        return "\n      float " + funcName + "(int row, int col, int depth,\n                    int depth2, int depth3, int depth4) {\n        int texR = row * " + shape[1] * shape[2] + " + col * " + shape[2] + " + depth;\n        int texC = depth4;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                  vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
+        return "\n      float " + funcName + "(int row, int col, int depth,\n                    int depth2, int depth3, int depth4) {\n        float texR = dot(\n          vec4(row, col, depth, depth2),\n          vec4(" + shape[1] * shape[2] * shape[3] * shape[4] + ",\n               " + shape[2] * shape[3] * shape[4] + ",\n               " + shape[3] * shape[4] + ",\n               " + shape[4] + ")) + depth3;\n        int texC = depth4;\n        vec2 uv = (vec2(texC, texR) + halfCR) /\n                  vec2(" + texNumC + ".0, " + texNumR + ".0);\n        return sampleTexture(" + texName + ", uv);\n      }\n    ";
     }
     return "\n    float " + funcName + "(int row, int col, int depth,\n                  int depth2, int depth3, int depth4) {\n      vec2 uv = UVfrom6D(" + texNumR + ", " + texNumC + ", " + stride0 + ", " + stride1 + ",\n          " + stride2 + ", " + stride3 + ", " + stride4 + "\n          ,row, col, depth, depth2, depth3, depth4);\n      return sampleTexture(" + texName + ", uv);\n    }\n  ";
 }
@@ -15677,7 +16116,7 @@ function getSqueezedParams(params, keptDims) {
     return keptDims.map(function (d) { return params[d]; }).join(', ');
 }
 
-},{"../../ops/broadcast_util":130,"../../util":185}],114:[function(require,module,exports){
+},{"../../ops/broadcast_util":134,"../../util":194}],118:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var shader_compiler_1 = require("./shader_compiler");
@@ -15741,7 +16180,7 @@ function getCoords(rank) {
     }
 }
 
-},{"./shader_compiler":113}],115:[function(require,module,exports){
+},{"./shader_compiler":117}],119:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var shader_compiler_1 = require("./shader_compiler");
@@ -15779,7 +16218,7 @@ var StridedSliceProgram = (function () {
 }());
 exports.StridedSliceProgram = StridedSliceProgram;
 
-},{"./shader_compiler":113}],116:[function(require,module,exports){
+},{"./shader_compiler":117}],120:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var TextureUsage;
@@ -15796,6 +16235,7 @@ var PhysicalTextureType;
     PhysicalTextureType[PhysicalTextureType["UNPACKED_FLOAT32"] = 1] = "UNPACKED_FLOAT32";
     PhysicalTextureType[PhysicalTextureType["PACKED_4X1_UNSIGNED_BYTE"] = 2] = "PACKED_4X1_UNSIGNED_BYTE";
     PhysicalTextureType[PhysicalTextureType["PACKED_2X2_FLOAT32"] = 3] = "PACKED_2X2_FLOAT32";
+    PhysicalTextureType[PhysicalTextureType["PACKED_2X2_FLOAT16"] = 4] = "PACKED_2X2_FLOAT16";
 })(PhysicalTextureType = exports.PhysicalTextureType || (exports.PhysicalTextureType = {}));
 function getUnpackedMatrixTextureShapeWidthHeight(rows, columns) {
     return [columns, rows];
@@ -15920,7 +16360,7 @@ function encodeMatrixToPackedRGBA(matrix, rows, columns, packedRGBA) {
 exports.encodeMatrixToPackedRGBA = encodeMatrixToPackedRGBA;
 function decodeMatrixFromPackedRGBA(packedRGBA, rows, columns, matrix) {
     var requiredSize = rows * columns;
-    if (requiredSize < matrix.length) {
+    if (matrix.length < requiredSize) {
         throw new Error("matrix length (" + matrix.length + ") must be >= " + requiredSize);
     }
     var oddWidth = (columns % 2) === 1;
@@ -15966,15 +16406,15 @@ function decodeMatrixFromPackedRGBA(packedRGBA, rows, columns, matrix) {
             matrix[dst++] = packedRGBA[src++];
             src += 2;
         }
-    }
-    if (oddWidth && oddHeight) {
-        matrix[matrix.length - 1] = packedRGBA[packedRGBA.length - 4];
+        if (oddWidth) {
+            matrix[dst] = packedRGBA[src];
+        }
     }
     return matrix;
 }
 exports.decodeMatrixFromPackedRGBA = decodeMatrixFromPackedRGBA;
 
-},{}],117:[function(require,module,exports){
+},{}],121:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../../environment");
@@ -16010,6 +16450,10 @@ var TextureManager = (function () {
         var newTexture;
         if (physicalTexType === tex_util_1.PhysicalTextureType.PACKED_2X2_FLOAT32) {
             newTexture = this.gpgpu.createPackedMatrixTexture(shapeRC[0], shapeRC[1]);
+        }
+        else if (physicalTexType === tex_util_1.PhysicalTextureType.PACKED_2X2_FLOAT16) {
+            newTexture =
+                this.gpgpu.createFloat16PackedMatrixTexture(shapeRC[0], shapeRC[1]);
         }
         else if (physicalTexType === tex_util_1.PhysicalTextureType.UNPACKED_FLOAT32) {
             newTexture =
@@ -16097,7 +16541,9 @@ function getPhysicalFromLogicalTextureType(logicalTexType) {
             tex_util_1.PhysicalTextureType.UNPACKED_FLOAT16;
     }
     else if (logicalTexType === tex_util_1.TextureUsage.PACK) {
-        return tex_util_1.PhysicalTextureType.PACKED_2X2_FLOAT32;
+        return environment_1.ENV.get('WEBGL_RENDER_FLOAT32_ENABLED') ?
+            tex_util_1.PhysicalTextureType.PACKED_2X2_FLOAT32 :
+            tex_util_1.PhysicalTextureType.PACKED_2X2_FLOAT16;
     }
     throw new Error("Unknown logical texture type " + logicalTexType);
 }
@@ -16105,7 +16551,7 @@ function getKeyFromTextureShape(shapeRowsCol, physicalTexType) {
     return shapeRowsCol[0] + "_" + shapeRowsCol[1] + "_" + physicalTexType;
 }
 
-},{"../../environment":51,"./tex_util":116}],118:[function(require,module,exports){
+},{"../../environment":51,"./tex_util":120}],122:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var shader_compiler_1 = require("./shader_compiler");
@@ -16141,7 +16587,7 @@ function getSourceCoords(aShape) {
     return sourceCoords.join();
 }
 
-},{"./shader_compiler":113}],119:[function(require,module,exports){
+},{"./shader_compiler":117}],123:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var shader_compiler_1 = require("./shader_compiler");
@@ -16174,7 +16620,7 @@ function getSwitchedCoords(newDim) {
     return switchedCoords.join();
 }
 
-},{"./shader_compiler":113}],120:[function(require,module,exports){
+},{"./shader_compiler":117}],124:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var erf_util = require("../../ops/erf_util");
@@ -16241,25 +16687,25 @@ exports.RECIPROCAL = "return 1.0 / x;";
 exports.LOGICAL_NOT = "return float(!(x >= 1.0));";
 exports.TO_INT = "return float(int(x));";
 
-},{"../../ops/erf_util":137,"../../ops/selu_util":157}],121:[function(require,module,exports){
+},{"../../ops/erf_util":141,"../../ops/selu_util":165}],125:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var UnpackProgram = (function () {
     function UnpackProgram(outputShape) {
         this.variableNames = ['A'];
         this.outputShape = outputShape;
-        this.userCode = "\n      const vec2 onePixel = 1. / vec2(" + outputShape[1] + ", " + outputShape[0] + ");\n\n      void main() {\n        ivec2 rc = getOutputCoords();\n        vec2 modCoord = mod(vec2(rc.y, rc.x), 2.);\n\n        vec4 packedInput = texture2D(A,\n          resultUV - step(1., modCoord) * onePixel);\n\n        setOutput(\n          modCoord.x == 0. ?\n            (modCoord.y == 0. ? packedInput.r : packedInput.b) :\n            (modCoord.y == 0. ? packedInput.g : packedInput.a)\n        );\n      }\n    ";
+        this.userCode = "\n      const vec2 onePixel = 1. / vec2(" + outputShape[1] + ", " + outputShape[0] + ");\n\n      void main() {\n        ivec2 rc = getOutputCoords();\n        vec2 modCoord = mod(vec2(rc.y, rc.x), 2.);\n        vec4 packedInput = getA(rc.x, rc.y);\n\n        setOutput(\n          modCoord.x == 0. ?\n            (modCoord.y == 0. ? packedInput.r : packedInput.b) :\n            (modCoord.y == 0. ? packedInput.g : packedInput.a)\n        );\n      }\n    ";
     }
     return UnpackProgram;
 }());
 exports.UnpackProgram = UnpackProgram;
 
-},{}],122:[function(require,module,exports){
+},{}],126:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var MAX_TEXTURE_SIZE = null;
-var util = require("../../util");
 var environment_1 = require("../../environment");
+var util = require("../../util");
+var tex_util_1 = require("../webgl/tex_util");
 function createWebGLRenderingContext(attributes) {
     var canvas = document.createElement('canvas');
     canvas.width = 1;
@@ -16410,15 +16856,6 @@ function createStaticIndexBuffer(gl, data) {
     return buffer;
 }
 exports.createStaticIndexBuffer = createStaticIndexBuffer;
-function queryMaxTextureSize(gl) {
-    if (MAX_TEXTURE_SIZE != null) {
-        return MAX_TEXTURE_SIZE;
-    }
-    MAX_TEXTURE_SIZE =
-        callAndCheck(gl, function () { return gl.getParameter(gl.MAX_TEXTURE_SIZE); });
-    return MAX_TEXTURE_SIZE;
-}
-exports.queryMaxTextureSize = queryMaxTextureSize;
 function getNumChannels() {
     if (environment_1.ENV.get('WEBGL_VERSION') === 2) {
         return 1;
@@ -16430,8 +16867,8 @@ function createTexture(gl) {
     return throwIfNull(gl, function () { return gl.createTexture(); }, 'Unable to create WebGLTexture.');
 }
 exports.createTexture = createTexture;
-function validateTextureSize(gl, width, height) {
-    var maxTextureSize = queryMaxTextureSize(gl);
+function validateTextureSize(width, height) {
+    var maxTextureSize = environment_1.ENV.get('WEBGL_MAX_TEXTURE_SIZE');
     if ((width <= 0) || (height <= 0)) {
         var requested = "[" + width + "x" + height + "]";
         throw new Error('Requested texture size ' + requested + ' is invalid.');
@@ -16537,12 +16974,19 @@ function validateTextureUnit(gl, textureUnit) {
         throw new Error("textureUnit must be in " + textureUnitRange + ".");
     }
 }
-function getTextureShapeFromLogicalShape(gl, logShape) {
+function getTextureShapeFromLogicalShape(logShape, usage) {
+    if (usage === void 0) { usage = tex_util_1.TextureUsage.UPLOAD; }
+    var maxTexSize = environment_1.ENV.get('WEBGL_MAX_TEXTURE_SIZE');
+    if (usage === tex_util_1.TextureUsage.PACK) {
+        maxTexSize = maxTexSize * 2;
+        logShape = logShape.map(function (d, i) { return i >= logShape.length - 2 ?
+            util.nearestLargerEven(logShape[i]) :
+            logShape[i]; });
+    }
     if (logShape.length !== 2) {
         var squeezeResult = util.squeezeShape(logShape);
         logShape = squeezeResult.newShape;
     }
-    var maxTexSize = queryMaxTextureSize(gl);
     var size = util.sizeFromShape(logShape);
     if (logShape.length <= 1 && size <= maxTexSize) {
         return [size, 1];
@@ -16551,9 +16995,18 @@ function getTextureShapeFromLogicalShape(gl, logShape) {
         logShape[1] <= maxTexSize) {
         return logShape;
     }
+    else if (logShape.length === 3 && logShape[0] * logShape[1] <= maxTexSize &&
+        logShape[2] <= maxTexSize) {
+        return [logShape[0] * logShape[1], logShape[2]];
+    }
     else if (logShape.length === 3 && logShape[0] <= maxTexSize &&
         logShape[1] * logShape[2] <= maxTexSize) {
         return [logShape[0], logShape[1] * logShape[2]];
+    }
+    else if (logShape.length === 4 &&
+        logShape[0] * logShape[1] * logShape[2] <= maxTexSize &&
+        logShape[3] <= maxTexSize) {
+        return [logShape[0] * logShape[1] * logShape[2], logShape[3]];
     }
     else if (logShape.length === 4 && logShape[0] <= maxTexSize &&
         logShape[1] * logShape[2] * logShape[3] <= maxTexSize) {
@@ -16565,7 +17018,7 @@ function getTextureShapeFromLogicalShape(gl, logShape) {
 }
 exports.getTextureShapeFromLogicalShape = getTextureShapeFromLogicalShape;
 
-},{"../../environment":51,"../../util":185}],123:[function(require,module,exports){
+},{"../../environment":51,"../../util":194,"../webgl/tex_util":120}],127:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var array_ops_1 = require("../ops/array_ops");
@@ -16587,7 +17040,7 @@ function whereImpl(condShape, condVals) {
 }
 exports.whereImpl = whereImpl;
 
-},{"../ops/array_ops":125}],124:[function(require,module,exports){
+},{"../ops/array_ops":129}],128:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("./environment");
@@ -16612,7 +17065,7 @@ function log() {
 }
 exports.log = log;
 
-},{"./environment":51}],125:[function(require,module,exports){
+},{"./environment":51}],129:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -17011,9 +17464,10 @@ function stack_(tensors, axis) {
 function batchToSpaceND_(x, blockShape, crops) {
     var $x = tensor_util_env_1.convertToTensor(x, 'x', 'batchToSpaceND');
     var prod = blockShape.reduce(function (a, b) { return a * b; });
-    util.assert($x.rank >= 1 + blockShape.length, "input rank should be > than [blockShape] but got " + $x.rank);
-    util.assert(crops.length === blockShape.length, "crops.shape[0] must be equal to [blockShape] but got " + crops.length);
-    util.assert($x.shape[0] % prod === 0, "input tensor batch must be divisible by prod( blockShape )");
+    util.assert($x.rank >= 1 + blockShape.length, "input rank is " + $x.rank + " but should be > than blockShape.length " + blockShape.length);
+    util.assert(crops.length === blockShape.length, "crops.length is " + crops.length + " but should be equal to blockShape.length  " + blockShape.length);
+    util.assert($x.shape[0] % prod === 0, "input tensor batch is " + $x.shape[0] + " but is not divisible by the product of " +
+        ("the elements of blockShape " + blockShape.join(' * ') + " === " + prod));
     var grad = function (dy) {
         return { $x: function () { return dy.spaceToBatchND(blockShape, crops); } };
     };
@@ -17140,7 +17594,7 @@ exports.tile = operation_1.op({ tile_: tile_ });
 exports.truncatedNormal = operation_1.op({ truncatedNormal_: truncatedNormal_ });
 exports.unstack = operation_1.op({ unstack_: unstack_ });
 
-},{"../environment":51,"../tensor":178,"../tensor_util_env":181,"../util":185,"./axis_util":127,"./concat_split":133,"./operation":147,"./rand":150,"./tensor_ops":162}],126:[function(require,module,exports){
+},{"../environment":51,"../tensor":187,"../tensor_util_env":190,"../util":194,"./axis_util":131,"./concat_split":137,"./operation":153,"./rand":156,"./tensor_ops":171}],130:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 function getReshaped(inputShape, blockShape, prod, batchToSpace) {
@@ -17238,7 +17692,7 @@ function getSliceSize(uncroppedShape, crops, blockShape) {
 }
 exports.getSliceSize = getSliceSize;
 
-},{}],127:[function(require,module,exports){
+},{}],131:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("../util");
@@ -17328,7 +17782,7 @@ function getInnerMostAxes(numAxes, rank) {
 }
 exports.getInnerMostAxes = getInnerMostAxes;
 
-},{"../util":185}],128:[function(require,module,exports){
+},{"../util":194}],132:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -17548,7 +18002,7 @@ exports.batchNormalization3d = operation_1.op({ batchNormalization3d_: batchNorm
 exports.batchNormalization4d = operation_1.op({ batchNormalization4d_: batchNormalization4d_ });
 exports.batchNormalization = operation_1.op({ batchNormalization_: batchNormalization_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./array_ops":125,"./broadcast_util":130,"./operation":147,"./tensor_ops":162,"./unary_ops":165}],129:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./array_ops":129,"./broadcast_util":134,"./operation":153,"./tensor_ops":171,"./unary_ops":174}],133:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -17914,7 +18368,7 @@ exports.squaredDifferenceStrict = operation_1.op({ squaredDifferenceStrict_: squ
 exports.sub = operation_1.op({ sub_: sub_ });
 exports.subStrict = operation_1.op({ subStrict_: subStrict_ });
 
-},{"../environment":51,"../tensor_util":180,"../tensor_util_env":181,"../types":184,"../util":185,"./broadcast_util":130,"./operation":147,"./tensor_ops":162,"./unary_ops":165}],130:[function(require,module,exports){
+},{"../environment":51,"../tensor_util":189,"../tensor_util_env":190,"../types":193,"../util":194,"./broadcast_util":134,"./operation":153,"./tensor_ops":171,"./unary_ops":174}],134:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 function getBroadcastDims(inShape, outShape) {
@@ -17984,7 +18438,7 @@ function assertAndGetBroadcastShape(shapeA, shapeB) {
 }
 exports.assertAndGetBroadcastShape = assertAndGetBroadcastShape;
 
-},{}],131:[function(require,module,exports){
+},{}],135:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -18088,7 +18542,7 @@ exports.lessStrict = operation_1.op({ lessStrict_: lessStrict_ });
 exports.notEqual = operation_1.op({ notEqual_: notEqual_ });
 exports.notEqualStrict = operation_1.op({ notEqualStrict_: notEqualStrict_ });
 
-},{"../environment":51,"../tensor_util":180,"../tensor_util_env":181,"../util":185,"./broadcast_util":130,"./operation":147,"./tensor_ops":162}],132:[function(require,module,exports){
+},{"../environment":51,"../tensor_util":189,"../tensor_util_env":190,"../util":194,"./broadcast_util":134,"./operation":153,"./tensor_ops":171}],136:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -18114,7 +18568,7 @@ exports.complex = operation_1.op({ complex_: complex_ });
 exports.real = operation_1.op({ real_: real_ });
 exports.imag = operation_1.op({ imag_: imag_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./operation":147}],133:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./operation":153}],137:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -18182,7 +18636,7 @@ exports.concat3d = operation_1.op({ concat3d_: concat3d_ });
 exports.concat4d = operation_1.op({ concat4d_: concat4d_ });
 exports.split = operation_1.op({ split_: split_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./axis_util":127,"./concat_util":134,"./operation":147,"./tensor_ops":162}],134:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./axis_util":131,"./concat_util":138,"./operation":153,"./tensor_ops":171}],138:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("../util");
@@ -18212,7 +18666,7 @@ function computeOutShape(shapes, axis) {
 }
 exports.computeOutShape = computeOutShape;
 
-},{"../util":185}],135:[function(require,module,exports){
+},{"../util":194}],139:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -18283,7 +18737,7 @@ function conv2d_(x, filter, strides, pad, dataFormat, dilations, dimRoundingMode
     if (convInfo.filterHeight === 1 && convInfo.filterWidth === 1 &&
         convInfo.dilationHeight === 1 && convInfo.dilationWidth === 1 &&
         convInfo.strideHeight === 1 && convInfo.strideWidth === 1 &&
-        convInfo.padInfo.type === 'SAME') {
+        (convInfo.padInfo.type === 'SAME' || convInfo.padInfo.type === 'VALID')) {
         var x2d = x4D.reshape([-1, convInfo.inChannels]);
         var w2d = $filter.reshape([convInfo.inChannels, convInfo.outChannels]);
         res = matmul_1.matMul(x2d, w2d).reshape(convInfo.outShape);
@@ -18492,7 +18946,7 @@ exports.depthwiseConv2d = operation_1.op({ depthwiseConv2d_: depthwiseConv2d_ })
 exports.separableConv2d = operation_1.op({ separableConv2d_: separableConv2d_ });
 exports.conv2dTranspose = operation_1.op({ conv2dTranspose_: conv2dTranspose_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./conv_util":136,"./matmul":144,"./operation":147}],136:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./conv_util":140,"./matmul":150,"./operation":153}],140:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("../util");
@@ -18639,7 +19093,7 @@ function conditionalRound(value, roundingMode) {
     }
 }
 
-},{"../util":185}],137:[function(require,module,exports){
+},{"../util":194}],141:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ERF_P = 0.3275911;
@@ -18649,7 +19103,64 @@ exports.ERF_A3 = 1.421413741;
 exports.ERF_A4 = -1.453152027;
 exports.ERF_A5 = 1.061405429;
 
-},{}],138:[function(require,module,exports){
+},{}],142:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var environment_1 = require("../environment");
+var tensor_util_env_1 = require("../tensor_util_env");
+var operation_1 = require("./operation");
+function gatherND_(x, indices) {
+    var $indices = tensor_util_env_1.convertToTensor(indices, 'indices', 'gatherND', 'int32');
+    var $x = tensor_util_env_1.convertToTensor(x, 'x', 'gatherND');
+    return environment_1.ENV.engine.runKernel(function (backend) { return backend.gatherND($x, $indices); }, { $x: $x, $indices: $indices });
+}
+exports.gatherND = operation_1.op({ gatherND_: gatherND_ });
+
+},{"../environment":51,"../tensor_util_env":190,"./operation":153}],143:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var util_1 = require("../util");
+function prepareAndValidate(tensor, indices) {
+    if (tensor.rank < 1) {
+        throw new Error('tf.gatherND() expects the input to be rank 1 or higher,' +
+            (" but the rank was " + tensor.rank + "."));
+    }
+    if (indices.rank < 1) {
+        throw new Error('tf.gatherND() expects the indices to be rank 1 or higher,' +
+            (" but the rank was " + indices.rank + "."));
+    }
+    if (indices.dtype !== 'int32') {
+        throw new Error('tf.gatherND() expects the indices to be int32 type,' +
+            (" but the dtype was " + indices.dtype + "."));
+    }
+    if (indices.shape[indices.rank - 1] > tensor.rank) {
+        throw new Error('index innermost dimension length must be <= tensor rank; saw: ' +
+            (indices.shape[indices.rank - 1] + " vs. " + tensor.rank));
+    }
+    if (tensor.size === 0) {
+        throw new Error('Requested more than 0 entries, but input is empty.' +
+            (" Input shape: " + tensor.shape + "."));
+    }
+    var indicesShape = indices.shape;
+    var sliceRank = indicesShape[indicesShape.length - 1];
+    var nResult = 1;
+    for (var i = 0; i < indicesShape.length - 1; ++i) {
+        nResult *= indicesShape[i];
+    }
+    var inputShape = tensor.shape;
+    var resultShape = indicesShape.slice();
+    resultShape.pop();
+    var sliceSize = 1;
+    for (var i = sliceRank; i < tensor.rank; ++i) {
+        sliceSize *= inputShape[i];
+        resultShape.push(inputShape[i]);
+    }
+    var strides = util_1.computeStrides(tensor.shape).map(function (stride) { return stride / sliceSize; }).concat([1]).slice(0, sliceRank);
+    return [resultShape, nResult, sliceSize, strides];
+}
+exports.prepareAndValidate = prepareAndValidate;
+
+},{"../util":194}],144:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -18844,7 +19355,7 @@ exports.nonMaxSuppression = operation_1.op({ nonMaxSuppression_: nonMaxSuppressi
 exports.nonMaxSuppressionAsync = nonMaxSuppressionAsync_;
 exports.cropAndResize = cropAndResize_;
 
-},{"../environment":51,"../kernels/non_max_suppression_impl":72,"../tensor_util_env":181,"../util":185,"./operation":147}],139:[function(require,module,exports){
+},{"../environment":51,"../kernels/non_max_suppression_impl":72,"../tensor_util_env":190,"../util":194,"./operation":153}],145:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -18990,7 +19501,7 @@ function qr2d(x, fullMatrices) {
 exports.gramSchmidt = operation_1.op({ gramSchmidt_: gramSchmidt_ });
 exports.qr = operation_1.op({ qr_: qr_ });
 
-},{"../environment":51,"../globals":53,"../util":185,"./array_ops":125,"./concat_split":133,"./norm":146,"./operation":147,"./reduction_ops":152,"./tensor_ops":162}],140:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../util":194,"./array_ops":129,"./concat_split":137,"./norm":152,"./operation":153,"./reduction_ops":158,"./tensor_ops":171}],146:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -19107,7 +19618,7 @@ exports.logicalXor = operation_1.op({ logicalXor_: logicalXor_ });
 exports.where = operation_1.op({ where_: where_ });
 exports.whereAsync = whereAsync_;
 
-},{"../environment":51,"../kernels/where_impl":123,"../tensor_util_env":181,"../util":185,"./broadcast_util":130,"./operation":147,"./tensor_ops":162}],141:[function(require,module,exports){
+},{"../environment":51,"../kernels/where_impl":127,"../tensor_util_env":190,"../util":194,"./broadcast_util":134,"./operation":153,"./tensor_ops":171}],147:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var globals_1 = require("../globals");
@@ -19332,7 +19843,7 @@ exports.meanSquaredError = operation_1.op({ meanSquaredError_: meanSquaredError_
 exports.sigmoidCrossEntropy = operation_1.op({ sigmoidCrossEntropy_: sigmoidCrossEntropy_ });
 exports.softmaxCrossEntropy = operation_1.op({ softmaxCrossEntropy_: softmaxCrossEntropy_ });
 
-},{"../globals":53,"../tensor_util_env":181,"../util":185,"./axis_util":127,"./binary_ops":129,"./operation":147,"./tensor_ops":162}],142:[function(require,module,exports){
+},{"../globals":53,"../tensor_util_env":190,"../util":194,"./axis_util":131,"./binary_ops":133,"./operation":153,"./tensor_ops":171}],148:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -19369,7 +19880,7 @@ function localResponseNormalization_(x, depthRadius, bias, alpha, beta) {
 }
 exports.localResponseNormalization = operation_1.op({ localResponseNormalization_: localResponseNormalization_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./operation":147}],143:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./operation":153}],149:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tensor_util_env_1 = require("../tensor_util_env");
@@ -19418,7 +19929,7 @@ function basicLSTMCell_(forgetBias, lstmKernel, lstmBias, data, c, h) {
 exports.basicLSTMCell = operation_1.op({ basicLSTMCell_: basicLSTMCell_ });
 exports.multiRNNCell = operation_1.op({ multiRNNCell_: multiRNNCell_ });
 
-},{"../tensor_util_env":181,"./operation":147}],144:[function(require,module,exports){
+},{"../tensor_util_env":190,"./operation":153}],150:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -19514,7 +20025,7 @@ exports.matMul = operation_1.op({ matMul_: matMul_ });
 exports.dot = operation_1.op({ dot_: dot_ });
 exports.outerProduct = operation_1.op({ outerProduct_: outerProduct_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./operation":147}],145:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./operation":153}],151:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tensor_util_1 = require("../tensor_util");
@@ -19542,7 +20053,7 @@ function movingAverage_(v, x, decay, step, zeroDebias) {
 }
 exports.movingAverage = operation_1.op({ movingAverage_: movingAverage_ });
 
-},{"../tensor_util":180,"../tensor_util_env":181,"../util":185,"./binary_ops":129,"./operation":147,"./tensor_ops":162}],146:[function(require,module,exports){
+},{"../tensor_util":189,"../tensor_util_env":190,"../util":194,"./binary_ops":133,"./operation":153,"./tensor_ops":171}],152:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tensor_util_env_1 = require("../tensor_util_env");
@@ -19605,7 +20116,7 @@ function normImpl(x, p, axis) {
 }
 exports.norm = operation_1.op({ norm_: norm_ });
 
-},{"../tensor_util_env":181,"./axis_util":127,"./operation":147,"./tensor_ops":162}],147:[function(require,module,exports){
+},{"../tensor_util_env":190,"./axis_util":131,"./operation":153,"./tensor_ops":171}],153:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -19645,7 +20156,7 @@ function op(f) {
 }
 exports.op = op;
 
-},{"../environment":51}],148:[function(require,module,exports){
+},{"../environment":51}],154:[function(require,module,exports){
 "use strict";
 function __export(m) {
     for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
@@ -19676,6 +20187,9 @@ __export(require("./lstm"));
 __export(require("./moving_average"));
 __export(require("./strided_slice"));
 __export(require("./topk"));
+__export(require("./scatter_nd"));
+__export(require("./spectral_ops"));
+__export(require("./gather_nd"));
 var operation_1 = require("./operation");
 exports.op = operation_1.op;
 var losses = require("./loss_ops");
@@ -19684,8 +20198,10 @@ var linalg = require("./linalg_ops");
 exports.linalg = linalg;
 var image = require("./image_ops");
 exports.image = image;
+var spectral = require("./spectral_ops");
+exports.spectral = spectral;
 
-},{"./array_ops":125,"./batchnorm":128,"./binary_ops":129,"./compare":131,"./complex_ops":132,"./concat_split":133,"./conv":135,"./image_ops":138,"./linalg_ops":139,"./logical_ops":140,"./loss_ops":141,"./lrn":142,"./lstm":143,"./matmul":144,"./moving_average":145,"./norm":146,"./operation":147,"./pool":149,"./reduction_ops":152,"./relu_ops":153,"./reverse":154,"./segment_ops":155,"./slice":158,"./softmax":160,"./strided_slice":161,"./tensor_ops":162,"./topk":163,"./transpose":164,"./unary_ops":165}],149:[function(require,module,exports){
+},{"./array_ops":129,"./batchnorm":132,"./binary_ops":133,"./compare":135,"./complex_ops":136,"./concat_split":137,"./conv":139,"./gather_nd":142,"./image_ops":144,"./linalg_ops":145,"./logical_ops":146,"./loss_ops":147,"./lrn":148,"./lstm":149,"./matmul":150,"./moving_average":151,"./norm":152,"./operation":153,"./pool":155,"./reduction_ops":158,"./relu_ops":159,"./reverse":160,"./scatter_nd":161,"./segment_ops":163,"./slice":166,"./softmax":168,"./spectral_ops":169,"./strided_slice":170,"./tensor_ops":171,"./topk":172,"./transpose":173,"./unary_ops":174}],155:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -19789,7 +20305,7 @@ function avgPoolBackprop(dy, input, filterSize, strides, pad) {
 exports.maxPool = operation_1.op({ maxPool_: maxPool_ });
 exports.avgPool = operation_1.op({ avgPool_: avgPool_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./conv_util":136,"./operation":147}],150:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./conv_util":140,"./operation":153}],156:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var seedrandom = require("seedrandom");
@@ -19847,7 +20363,7 @@ var MPRandGauss = (function () {
 }());
 exports.MPRandGauss = MPRandGauss;
 
-},{"seedrandom":596}],151:[function(require,module,exports){
+},{"seedrandom":608}],157:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util_1 = require("../util");
@@ -19860,7 +20376,7 @@ function computeOptimalWindowSize(inSize) {
 }
 exports.computeOptimalWindowSize = computeOptimalWindowSize;
 
-},{"../util":185}],152:[function(require,module,exports){
+},{"../util":194}],158:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -19920,6 +20436,28 @@ function sum_(x, axis, keepDims) {
         return { value: value, gradFunc: gradFunc };
     });
     return customOp($x);
+}
+function prod_(x, axis, keepDims) {
+    if (axis === void 0) { axis = null; }
+    if (keepDims === void 0) { keepDims = false; }
+    var $x = tensor_util_env_1.convertToTensor(x, 'x', 'prod');
+    if ($x.dtype === 'bool') {
+        $x = $x.toInt();
+    }
+    var axes = axis_util.parseAxisParam(axis, $x.shape);
+    var permutation = axis_util.getAxesPermutation(axes, $x.rank);
+    var reductionAxes = axes;
+    var permutedX = $x;
+    if (permutation != null) {
+        permutedX = $x.transpose(permutation);
+        reductionAxes = axis_util.getInnerMostAxes(reductionAxes.length, $x.rank);
+    }
+    var value = environment_1.ENV.engine.runKernel(function (backend) { return backend.prod(permutedX, reductionAxes); }, { permutedX: permutedX });
+    if (keepDims) {
+        var newShape = axis_util.expandShapeToKeepDim(value.shape, axes);
+        value = value.reshape(newShape);
+    }
+    return value;
 }
 function mean_(x, axis, keepDims) {
     if (axis === void 0) { axis = null; }
@@ -20102,8 +20640,9 @@ exports.mean = operation_1.op({ mean_: mean_ });
 exports.min = operation_1.op({ min_: min_ });
 exports.moments = operation_1.op({ moments_: moments_ });
 exports.sum = operation_1.op({ sum_: sum_ });
+exports.prod = operation_1.op({ prod_: prod_ });
 
-},{"../environment":51,"../globals":53,"../tensor_util_env":181,"../util":185,"./axis_util":127,"./operation":147,"./tensor_ops":162}],153:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../tensor_util_env":190,"../util":194,"./axis_util":131,"./operation":153,"./tensor_ops":171}],159:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -20169,7 +20708,7 @@ exports.prelu = operation_1.op({ prelu_: prelu_ });
 exports.relu = operation_1.op({ relu_: relu_ });
 exports.selu = operation_1.op({ selu_: selu_ });
 
-},{"../environment":51,"../tensor_util_env":181,"./binary_ops":129,"./logical_ops":140,"./operation":147,"./selu_util":157,"./tensor_ops":162}],154:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"./binary_ops":133,"./logical_ops":146,"./operation":153,"./selu_util":165,"./tensor_ops":171}],160:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -20215,7 +20754,93 @@ exports.reverse2d = operation_1.op({ reverse2d_: reverse2d_ });
 exports.reverse3d = operation_1.op({ reverse3d_: reverse3d_ });
 exports.reverse4d = operation_1.op({ reverse4d_: reverse4d_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./axis_util":127,"./operation":147}],155:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./axis_util":131,"./operation":153}],161:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var environment_1 = require("../environment");
+var tensor_util_env_1 = require("../tensor_util_env");
+var operation_1 = require("./operation");
+function scatterND_(indices, updates, shape) {
+    var $indices = tensor_util_env_1.convertToTensor(indices, 'indices', 'scatterND', 'int32');
+    var $updates = tensor_util_env_1.convertToTensor(updates, 'updates', 'scatterND');
+    return environment_1.ENV.engine.runKernel(function (backend) { return backend.scatterND($indices, $updates, shape); }, { $indices: $indices, $updates: $updates });
+}
+exports.scatterND = operation_1.op({ scatterND_: scatterND_ });
+
+},{"../environment":51,"../tensor_util_env":190,"./operation":153}],162:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var util_1 = require("../util");
+function validateUpdateShape(shape, indices, updates) {
+    var sliceDim = (indices.rank > 1) ? indices.shape[indices.rank - 1] : 1;
+    var batchDim = (indices.rank > 1) ? indices.rank - 1 : 1;
+    var shapeError = 'Must have updates.shape = indices.shape[:batchDim] + ' +
+        ("shape[sliceDim:], got updates.shape: " + updates.shape) +
+        (", indices.shape: " + indices.shape + ", shape: " + shape) +
+        (", sliceDim: " + sliceDim + ", and batchDim: " + batchDim + ".");
+    if (updates.rank < batchDim) {
+        throw new Error(shapeError + (" update.rank < " + batchDim + ". "));
+    }
+    if (shape.length < sliceDim + (updates.rank - batchDim)) {
+        throw new Error(shapeError +
+            (" Output shape length < " + (sliceDim + (updates.rank - batchDim))));
+    }
+    if (updates.rank !== batchDim + shape.length - sliceDim) {
+        throw new Error(shapeError + (" update.rank != " + (batchDim + shape.length - sliceDim)));
+    }
+    for (var d = 0; d < batchDim; ++d) {
+        if (updates.shape[d] !== indices.shape[d]) {
+            throw new Error(shapeError +
+                (" updates.shape[" + d + "] (" + updates.shape[d] + ") != indices.shape[" + d + "] (" + indices.shape[d] + ")."));
+        }
+    }
+    for (var d = 0; d < updates.rank - batchDim; ++d) {
+        if (updates.shape[d + batchDim] !== shape[d + sliceDim]) {
+            throw new Error(shapeError +
+                (" updates.shape[" + (d + batchDim) + "] (" + updates.shape[d + batchDim] + ") != shape[" + (d + batchDim) + "] (" + shape[d + batchDim] + ")"));
+        }
+    }
+}
+exports.validateUpdateShape = validateUpdateShape;
+function prepareAndValidate(updates, indices, shape) {
+    if (indices.rank < 1) {
+        throw new Error('tf.scatterND() expects the indices to be rank 1 or higher,' +
+            (" but the rank was " + indices.rank + "."));
+    }
+    if (updates.rank < 1) {
+        throw new Error('tf.scatterND() expects the updates to be rank 1 or higher,' +
+            (" but the rank was " + updates.rank + "."));
+    }
+    if (indices.dtype !== 'int32') {
+        throw new Error("The dtype of 'indices' should be int32, but got dtype: " + indices.dtype);
+    }
+    if (shape.length < 1) {
+        throw new Error("Output rank must be greater or equal to 1, but got shape: " + shape);
+    }
+    if (shape.length === 0) {
+        if (indices.size === 0) {
+            throw new Error("Indices specified for empty output. indices shape: " + indices.shape);
+        }
+        if (updates.size === 0) {
+            throw new Error("Updates specified for empty output. updates shape: " + updates.shape);
+        }
+    }
+    validateUpdateShape(shape, indices, updates);
+    var sliceDim = (indices.rank > 1) ? indices.shape[indices.rank - 1] : 1;
+    var totalNd = shape.length;
+    var sliceSize = 1;
+    for (var i = sliceDim; i < totalNd; ++i) {
+        sliceSize *= shape[i];
+    }
+    var safeSliceDim = (sliceDim < 1) ? 1 : sliceDim;
+    var numUpdates = indices.size / safeSliceDim;
+    var outputStrides = util_1.computeStrides(shape).concat([1]);
+    var sliceStrides = outputStrides.slice(outputStrides.length - sliceDim, outputStrides.length);
+    return [sliceDim, numUpdates, sliceSize, sliceStrides, util_1.sizeFromShape(shape)];
+}
+exports.prepareAndValidate = prepareAndValidate;
+
+},{"../util":194}],163:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -20307,7 +20932,7 @@ function gatherDropNegatives(x, indices) {
 exports.gather = operation_1.op({ gather_: gather_ });
 exports.unsortedSegmentSum = operation_1.op({ unsortedSegmentSum_: unsortedSegmentSum_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./array_ops":125,"./axis_util":127,"./binary_ops":129,"./compare":131,"./logical_ops":140,"./operation":147,"./tensor_ops":162}],156:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./array_ops":129,"./axis_util":131,"./binary_ops":133,"./compare":135,"./logical_ops":146,"./operation":153,"./tensor_ops":171}],164:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util_1 = require("../util");
@@ -20349,13 +20974,13 @@ function computeOutShape(aShape, axis, numSegments) {
 }
 exports.computeOutShape = computeOutShape;
 
-},{"../util":185,"./reduce_util":151}],157:[function(require,module,exports){
+},{"../util":194,"./reduce_util":157}],165:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SELU_SCALEALPHA = 1.7580993408473768599402175208123;
 exports.SELU_SCALE = 1.0507009873554804934193349852946;
 
-},{}],158:[function(require,module,exports){
+},{}],166:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -20370,17 +20995,17 @@ function slice1d_(x, begin, size) {
 }
 function slice2d_(x, begin, size) {
     var $x = tensor_util_env_1.convertToTensor(x, 'x', 'slice2d');
-    util.assert($x.rank === 2, "slice1d expects a rank-2 tensor, but got a rank-" + $x.rank + " tensor");
+    util.assert($x.rank === 2, "slice2d expects a rank-2 tensor, but got a rank-" + $x.rank + " tensor");
     return exports.slice($x, begin, size);
 }
 function slice3d_(x, begin, size) {
     var $x = tensor_util_env_1.convertToTensor(x, 'x', 'slice3d');
-    util.assert($x.rank === 3, "slice1d expects a rank-3 tensor, but got a rank-" + $x.rank + " tensor");
+    util.assert($x.rank === 3, "slice3d expects a rank-3 tensor, but got a rank-" + $x.rank + " tensor");
     return exports.slice($x, begin, size);
 }
 function slice4d_(x, begin, size) {
     var $x = tensor_util_env_1.convertToTensor(x, 'x', 'slice4d');
-    util.assert($x.rank === 4, "slice1d expects a rank-4 tensor, but got a rank-" + $x.rank + " tensor");
+    util.assert($x.rank === 4, "slice4d expects a rank-4 tensor, but got a rank-" + $x.rank + " tensor");
     return exports.slice($x, begin, size);
 }
 function slice_(x, begin, size) {
@@ -20437,7 +21062,7 @@ exports.slice2d = operation_1.op({ slice2d_: slice2d_ });
 exports.slice3d = operation_1.op({ slice3d_: slice3d_ });
 exports.slice4d = operation_1.op({ slice4d_: slice4d_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./operation":147,"./slice_util":159}],159:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./operation":153,"./slice_util":167}],167:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("../util");
@@ -20528,7 +21153,7 @@ function stopForAxis(endMask, stopIndices, strides, inputShape, axis) {
 }
 exports.stopForAxis = stopForAxis;
 
-},{"../util":185}],160:[function(require,module,exports){
+},{"../util":194}],168:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var gradients_1 = require("../gradients");
@@ -20560,7 +21185,21 @@ function softmax_(logits, dim) {
 }
 exports.softmax = operation_1.op({ softmax_: softmax_ });
 
-},{"../gradients":54,"../tensor_util_env":181,"./operation":147}],161:[function(require,module,exports){
+},{"../gradients":54,"../tensor_util_env":190,"./operation":153}],169:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var environment_1 = require("../environment");
+var operation_1 = require("../ops/operation");
+var util_1 = require("../util");
+function fft_(input) {
+    util_1.assert(input.dtype === 'complex64', 'dtype must be complex64');
+    util_1.assert(input.rank === 1, 'input rank must be 1');
+    var ret = environment_1.ENV.engine.runKernel(function (backend) { return backend.fft(input); }, { input: input });
+    return ret;
+}
+exports.fft = operation_1.op({ fft_: fft_ });
+
+},{"../environment":51,"../ops/operation":153,"../util":194}],170:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -20583,12 +21222,13 @@ function stridedSlice_(x, begin, end, strides, beginMask, endMask, ellipsisMask,
 }
 exports.stridedSlice = operation_1.op({ stridedSlice_: stridedSlice_ });
 
-},{"../environment":51,"../tensor_util_env":181,"./operation":147}],162:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"./operation":153}],171:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
 var tensor_1 = require("../tensor");
 var tensor_util_env_1 = require("../tensor_util_env");
+var tensor_util_env_2 = require("../tensor_util_env");
 var util_1 = require("../util");
 var complex_ops_1 = require("./complex_ops");
 var operation_1 = require("./operation");
@@ -20603,7 +21243,7 @@ function tensor(values, shape, dtype) {
         throw new Error('values passed to tensor(values) must be an ' +
             'array of numbers or booleans, or a TypedArray');
     }
-    var inferredShape = util_1.inferShape(values);
+    var inferredShape = tensor_util_env_2.inferShape(values);
     if (shape != null && inferredShape.length !== 1) {
         util_1.assertShapesMatch(shape, inferredShape, "Error creating a new Tensor. " +
             ("Inferred shape (" + inferredShape + ") does not match the ") +
@@ -20630,7 +21270,7 @@ exports.scalar = scalar;
 function tensor1d(values, dtype) {
     if (dtype === void 0) { dtype = 'float32'; }
     util_1.assertNonNull(values);
-    var inferredShape = util_1.inferShape(values);
+    var inferredShape = tensor_util_env_2.inferShape(values);
     if (inferredShape.length !== 1) {
         throw new Error('tensor1d() requires values to be a flat/TypedArray');
     }
@@ -20643,7 +21283,7 @@ function tensor2d(values, shape, dtype) {
     if (shape != null && shape.length !== 2) {
         throw new Error('tensor2d() requires shape to have two numbers');
     }
-    var inferredShape = util_1.inferShape(values);
+    var inferredShape = tensor_util_env_2.inferShape(values);
     if (inferredShape.length !== 2 && inferredShape.length !== 1) {
         throw new Error('tensor2d() requires values to be number[][] or flat/TypedArray');
     }
@@ -20661,7 +21301,7 @@ function tensor3d(values, shape, dtype) {
     if (shape != null && shape.length !== 3) {
         throw new Error('tensor3d() requires shape to have three numbers');
     }
-    var inferredShape = util_1.inferShape(values);
+    var inferredShape = tensor_util_env_2.inferShape(values);
     if (inferredShape.length !== 3 && inferredShape.length !== 1) {
         throw new Error('tensor3d() requires values to be number[][][] or flat/TypedArray');
     }
@@ -20679,7 +21319,7 @@ function tensor4d(values, shape, dtype) {
     if (shape != null && shape.length !== 4) {
         throw new Error('tensor4d() requires shape to have four numbers');
     }
-    var inferredShape = util_1.inferShape(values);
+    var inferredShape = tensor_util_env_2.inferShape(values);
     if (inferredShape.length !== 4 && inferredShape.length !== 1) {
         throw new Error('tensor4d() requires values to be number[][][][] or flat/TypedArray');
     }
@@ -20697,7 +21337,7 @@ function tensor5d(values, shape, dtype) {
     if (shape != null && shape.length !== 5) {
         throw new Error('tensor5d() requires shape to have five numbers');
     }
-    var inferredShape = util_1.inferShape(values);
+    var inferredShape = tensor_util_env_2.inferShape(values);
     if (inferredShape.length !== 5 && inferredShape.length !== 1) {
         throw new Error('tensor5d() requires values to be ' +
             'number[][][][][] or flat/TypedArray');
@@ -20716,7 +21356,7 @@ function tensor6d(values, shape, dtype) {
     if (shape != null && shape.length !== 6) {
         throw new Error('tensor6d() requires shape to have six numbers');
     }
-    var inferredShape = util_1.inferShape(values);
+    var inferredShape = tensor_util_env_2.inferShape(values);
     if (inferredShape.length !== 6 && inferredShape.length !== 1) {
         throw new Error('tensor6d() requires values to be number[][][][] or flat/TypedArray');
     }
@@ -20807,7 +21447,7 @@ exports.range = range;
 exports.onesLike = operation_1.op({ onesLike_: onesLike_ });
 exports.zerosLike = operation_1.op({ zerosLike_: zerosLike_ });
 
-},{"../environment":51,"../tensor":178,"../tensor_util_env":181,"../util":185,"./complex_ops":132,"./operation":147}],163:[function(require,module,exports){
+},{"../environment":51,"../tensor":187,"../tensor_util_env":190,"../util":194,"./complex_ops":136,"./operation":153}],172:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -20830,7 +21470,7 @@ function topk_(x, k, sorted) {
 }
 exports.topk = operation_1.op({ topk_: topk_ });
 
-},{"../environment":51,"../tensor_util_env":181,"./operation":147}],164:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"./operation":153}],173:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -20860,7 +21500,7 @@ function transpose_(x, perm) {
 }
 exports.transpose = operation_1.op({ transpose_: transpose_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./axis_util":127,"./operation":147}],165:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./axis_util":131,"./operation":153}],174:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("../environment");
@@ -21150,7 +21790,7 @@ exports.step = operation_1.op({ step_: step_ });
 exports.tan = operation_1.op({ tan_: tan_ });
 exports.tanh = operation_1.op({ tanh_: tanh_ });
 
-},{"../environment":51,"../tensor_util_env":181,"../util":185,"./operation":147,"./tensor_ops":162}],166:[function(require,module,exports){
+},{"../environment":51,"../tensor_util_env":190,"../util":194,"./operation":153,"./tensor_ops":171}],175:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -21257,7 +21897,7 @@ var AdadeltaOptimizer = (function (_super) {
 exports.AdadeltaOptimizer = AdadeltaOptimizer;
 serialization_1.registerClass(AdadeltaOptimizer);
 
-},{"../environment":51,"../globals":53,"../ops/ops":148,"../serialization":176,"./optimizer":171}],167:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../ops/ops":154,"../serialization":185,"./optimizer":180}],176:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -21339,7 +21979,7 @@ var AdagradOptimizer = (function (_super) {
 exports.AdagradOptimizer = AdagradOptimizer;
 serialization_1.registerClass(AdagradOptimizer);
 
-},{"../environment":51,"../globals":53,"../ops/ops":148,"../serialization":176,"./optimizer":171}],168:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../ops/ops":154,"../serialization":185,"./optimizer":180}],177:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -21458,7 +22098,7 @@ var AdamOptimizer = (function (_super) {
 exports.AdamOptimizer = AdamOptimizer;
 serialization_1.registerClass(AdamOptimizer);
 
-},{"../environment":51,"../globals":53,"../ops/ops":148,"../serialization":176,"./optimizer":171}],169:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../ops/ops":154,"../serialization":185,"./optimizer":180}],178:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -21579,7 +22219,7 @@ var AdamaxOptimizer = (function (_super) {
 exports.AdamaxOptimizer = AdamaxOptimizer;
 serialization_1.registerClass(AdamaxOptimizer);
 
-},{"../environment":51,"../globals":53,"../ops/ops":148,"../serialization":176,"./optimizer":171}],170:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../ops/ops":154,"../serialization":185,"./optimizer":180}],179:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -21669,7 +22309,7 @@ var MomentumOptimizer = (function (_super) {
 exports.MomentumOptimizer = MomentumOptimizer;
 serialization_1.registerClass(MomentumOptimizer);
 
-},{"../environment":51,"../globals":53,"../ops/ops":148,"../serialization":176,"./sgd_optimizer":174}],171:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../ops/ops":154,"../serialization":185,"./sgd_optimizer":183}],180:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -21710,7 +22350,7 @@ var Optimizer = (function (_super) {
 }(serialization_1.Serializable));
 exports.Optimizer = Optimizer;
 
-},{"../globals":53,"../serialization":176}],172:[function(require,module,exports){
+},{"../globals":53,"../serialization":185}],181:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var adadelta_optimizer_1 = require("./adadelta_optimizer");
@@ -21766,7 +22406,7 @@ var OptimizerConstructors = (function () {
 }());
 exports.OptimizerConstructors = OptimizerConstructors;
 
-},{"./adadelta_optimizer":166,"./adagrad_optimizer":167,"./adam_optimizer":168,"./adamax_optimizer":169,"./momentum_optimizer":170,"./rmsprop_optimizer":173,"./sgd_optimizer":174}],173:[function(require,module,exports){
+},{"./adadelta_optimizer":175,"./adagrad_optimizer":176,"./adam_optimizer":177,"./adamax_optimizer":178,"./momentum_optimizer":179,"./rmsprop_optimizer":182,"./sgd_optimizer":183}],182:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -21910,7 +22550,7 @@ var RMSPropOptimizer = (function (_super) {
 exports.RMSPropOptimizer = RMSPropOptimizer;
 serialization_1.registerClass(RMSPropOptimizer);
 
-},{"../environment":51,"../globals":53,"../ops/ops":148,"../serialization":176,"./optimizer":171}],174:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../ops/ops":154,"../serialization":185,"./optimizer":180}],183:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -21970,7 +22610,7 @@ var SGDOptimizer = (function (_super) {
 exports.SGDOptimizer = SGDOptimizer;
 serialization_1.registerClass(SGDOptimizer);
 
-},{"../environment":51,"../globals":53,"../ops/ops":148,"../serialization":176,"./optimizer":171}],175:[function(require,module,exports){
+},{"../environment":51,"../globals":53,"../ops/ops":154,"../serialization":185,"./optimizer":180}],184:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util = require("./util");
@@ -22017,7 +22657,7 @@ var Logger = (function () {
 }());
 exports.Logger = Logger;
 
-},{"./util":185}],176:[function(require,module,exports){
+},{"./util":194}],185:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util_1 = require("./util");
@@ -22062,7 +22702,7 @@ function registerClass(cls) {
 }
 exports.registerClass = registerClass;
 
-},{"./util":185}],177:[function(require,module,exports){
+},{"./util":194}],186:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tensor_1 = require("./tensor");
@@ -22175,7 +22815,7 @@ function backpropagateGradients(tensorAccumulatedGradientMap, filteredTape) {
 }
 exports.backpropagateGradients = backpropagateGradients;
 
-},{"./tensor":178,"./util":185}],178:[function(require,module,exports){
+},{"./tensor":187,"./util":194}],187:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -22561,6 +23201,12 @@ var Tensor = (function () {
         if (keepDims === void 0) { keepDims = false; }
         this.throwIfDisposed();
         return opHandler.sum(this, axis, keepDims);
+    };
+    Tensor.prototype.prod = function (axis, keepDims) {
+        if (axis === void 0) { axis = null; }
+        if (keepDims === void 0) { keepDims = false; }
+        this.throwIfDisposed();
+        return opHandler.prod(this, axis, keepDims);
     };
     Tensor.prototype.mean = function (axis, keepDims) {
         if (axis === void 0) { axis = null; }
@@ -22995,6 +23641,10 @@ var Tensor = (function () {
         this.throwIfDisposed();
         return opHandler.depthToSpace(this, blockSize, dataFormat);
     };
+    Tensor.prototype.fft = function () {
+        this.throwIfDisposed();
+        return opHandler.spectral.fft(this);
+    };
     Tensor.nextId = 0;
     return Tensor;
 }());
@@ -23057,7 +23707,7 @@ Object.defineProperty(Variable, Symbol.hasInstance, {
 var variable = Variable.variable;
 exports.variable = variable;
 
-},{"./tensor_format":179,"./util":185}],179:[function(require,module,exports){
+},{"./tensor_format":188,"./util":194}],188:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var util_1 = require("./util");
@@ -23188,7 +23838,7 @@ function createComplexTuples(vals) {
     return complexTuples;
 }
 
-},{"./util":185}],180:[function(require,module,exports){
+},{"./util":194}],189:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tensor_1 = require("./tensor");
@@ -23263,12 +23913,47 @@ function isIterable(obj) {
     return Array.isArray(obj) || typeof obj === 'object';
 }
 
-},{"./tensor":178,"./util":185}],181:[function(require,module,exports){
+},{"./tensor":187,"./util":194}],190:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("./environment");
 var tensor_1 = require("./tensor");
 var util_1 = require("./util");
+function inferShape(val) {
+    var firstElem = val;
+    if (util_1.isTypedArray(val)) {
+        return [val.length];
+    }
+    if (!Array.isArray(val)) {
+        return [];
+    }
+    var shape = [];
+    while (firstElem instanceof Array) {
+        shape.push(firstElem.length);
+        firstElem = firstElem[0];
+    }
+    if (val instanceof Array && environment_1.ENV.get('TENSORLIKE_CHECK_SHAPE_CONSISTENCY')) {
+        deepAssertShapeConsistency(val, shape, []);
+    }
+    return shape;
+}
+exports.inferShape = inferShape;
+function deepAssertShapeConsistency(val, shape, indices) {
+    indices = indices || [];
+    if (!(val instanceof Array)) {
+        util_1.assert(shape.length === 0, function () { return "Element arr[" + indices.join('][') + "] is a primitive, " +
+            ("but should be an array of " + shape[0] + " elements"); });
+        return;
+    }
+    util_1.assert(shape.length > 0, function () { return "Element arr[" + indices.join('][') + "] should be a primitive, " +
+        ("but is an array of " + val.length + " elements"); });
+    util_1.assert(val.length === shape[0], function () { return "Element arr[" + indices.join('][') + "] should have " + shape[0] + " " +
+        ("elements, but has " + val.length + " elements"); });
+    var subShape = shape.slice(1);
+    for (var i = 0; i < val.length; ++i) {
+        deepAssertShapeConsistency(val[i], subShape, indices.concat(i));
+    }
+}
 function convertToTensor(x, argName, functionName, dtype) {
     if (dtype === void 0) { dtype = 'float32'; }
     dtype = dtype || 'float32';
@@ -23280,7 +23965,7 @@ function convertToTensor(x, argName, functionName, dtype) {
         throw new Error("Argument '" + argName + "' passed to '" + functionName + "' must be a " +
             ("Tensor or TensorLike, but got " + x.constructor.name));
     }
-    var inferredShape = util_1.inferShape(x);
+    var inferredShape = inferShape(x);
     if (!util_1.isTypedArray(x) && !Array.isArray(x)) {
         x = [x];
     }
@@ -23297,7 +23982,7 @@ function convertToTensorArray(arg, argName, functionName) {
 }
 exports.convertToTensorArray = convertToTensorArray;
 
-},{"./environment":51,"./tensor":178,"./util":185}],182:[function(require,module,exports){
+},{"./environment":51,"./tensor":187,"./util":194}],191:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var environment_1 = require("./environment");
@@ -23418,7 +24103,7 @@ function expectArrayBuffersEqual(actual, expected) {
 }
 exports.expectArrayBuffersEqual = expectArrayBuffersEqual;
 
-},{"./environment":51,"./tensor":178,"./util":185}],183:[function(require,module,exports){
+},{"./environment":51,"./tensor":187,"./util":194}],192:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var adadelta_optimizer_1 = require("./optimizers/adadelta_optimizer");
@@ -23441,7 +24126,7 @@ exports.train = {
     adam: optimizer_constructors_1.OptimizerConstructors.adam
 };
 
-},{"./optimizers/adadelta_optimizer":166,"./optimizers/adagrad_optimizer":167,"./optimizers/adam_optimizer":168,"./optimizers/adamax_optimizer":169,"./optimizers/momentum_optimizer":170,"./optimizers/optimizer_constructors":172,"./optimizers/rmsprop_optimizer":173,"./optimizers/sgd_optimizer":174}],184:[function(require,module,exports){
+},{"./optimizers/adadelta_optimizer":175,"./optimizers/adagrad_optimizer":176,"./optimizers/adam_optimizer":177,"./optimizers/adamax_optimizer":178,"./optimizers/momentum_optimizer":179,"./optimizers/optimizer_constructors":181,"./optimizers/rmsprop_optimizer":182,"./optimizers/sgd_optimizer":183}],193:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var DType;
@@ -23503,7 +24188,7 @@ function sumOutType(type) {
 }
 exports.sumOutType = sumOutType;
 
-},{}],185:[function(require,module,exports){
+},{}],194:[function(require,module,exports){
 (function (process){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -23524,6 +24209,10 @@ function clamp(min, x, max) {
     return Math.max(min, Math.min(x, max));
 }
 exports.clamp = clamp;
+function nearestLargerEven(val) {
+    return val % 2 === 0 ? val : val + 1;
+}
+exports.nearestLargerEven = nearestLargerEven;
 function randUniform(a, b) {
     var r = Math.random();
     return (b * r) + (1 - r) * a;
@@ -23566,41 +24255,6 @@ function flatten(arr, ret) {
     return ret;
 }
 exports.flatten = flatten;
-function inferShape(val) {
-    var firstElem = val;
-    if (isTypedArray(val)) {
-        return [val.length];
-    }
-    if (!Array.isArray(val)) {
-        return [];
-    }
-    var shape = [];
-    while (firstElem instanceof Array) {
-        shape.push(firstElem.length);
-        firstElem = firstElem[0];
-    }
-    if (val instanceof Array) {
-        deepAssertShapeConsistency(val, shape, []);
-    }
-    return shape;
-}
-exports.inferShape = inferShape;
-function deepAssertShapeConsistency(val, shape, indices) {
-    indices = indices || [];
-    if (!(val instanceof Array)) {
-        assert(shape.length === 0, function () { return "Element arr[" + indices.join('][') + "] is a primitive, " +
-            ("but should be an array of " + shape[0] + " elements"); });
-        return;
-    }
-    assert(shape.length > 0, function () { return "Element arr[" + indices.join('][') + "] should be a primitive, " +
-        ("but is an array of " + val.length + " elements"); });
-    assert(val.length === shape[0], function () { return "Element arr[" + indices.join('][') + "] should have " + shape[0] + " " +
-        ("elements, but has " + val.length + " elements"); });
-    var subShape = shape.slice(1);
-    for (var i = 0; i < val.length; ++i) {
-        deepAssertShapeConsistency(val[i], subShape, indices.concat(i));
-    }
-}
 function sizeFromShape(shape) {
     if (shape.length === 0) {
         return 1;
@@ -23617,6 +24271,12 @@ function isScalarShape(shape) {
 }
 exports.isScalarShape = isScalarShape;
 function arraysEqual(n1, n2) {
+    if (n1 === n2) {
+        return true;
+    }
+    if (n1 == null || n2 == null) {
+        return false;
+    }
     if (n1.length !== n2.length) {
         return false;
     }
@@ -23934,13 +24594,13 @@ function now() {
 exports.now = now;
 
 }).call(this,require('_process'))
-},{"_process":570}],186:[function(require,module,exports){
+},{"_process":582}],195:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var version = '0.13.2';
+var version = '0.13.6';
 exports.version = version;
 
-},{}],187:[function(require,module,exports){
+},{}],196:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var gpgpu_util = require("./kernels/webgl/gpgpu_util");
@@ -23952,7 +24612,7 @@ exports.MathBackendWebGL = backend_webgl_1.MathBackendWebGL;
 var gpgpu_context_1 = require("./kernels/webgl/gpgpu_context");
 exports.GPGPUContext = gpgpu_context_1.GPGPUContext;
 
-},{"./kernels/backend_webgl":70,"./kernels/webgl/gpgpu_context":92,"./kernels/webgl/gpgpu_util":94,"./kernels/webgl/webgl_util":122}],188:[function(require,module,exports){
+},{"./kernels/backend_webgl":70,"./kernels/webgl/gpgpu_context":94,"./kernels/webgl/gpgpu_util":96,"./kernels/webgl/webgl_util":126}],197:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -24153,7 +24813,7 @@ function getActivation(identifier) {
 }
 exports.getActivation = getActivation;
 
-},{"./backend/state":190,"./backend/tfjs_backend":191,"./utils/generic_utils":229,"@tensorflow/tfjs-core":55}],189:[function(require,module,exports){
+},{"./backend/state":199,"./backend/tfjs_backend":200,"./utils/generic_utils":241,"@tensorflow/tfjs-core":55}],198:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfjs_core_1 = require("@tensorflow/tfjs-core");
@@ -24171,7 +24831,7 @@ function imageDataFormat() {
 }
 exports.imageDataFormat = imageDataFormat;
 
-},{"@tensorflow/tfjs-core":55}],190:[function(require,module,exports){
+},{"@tensorflow/tfjs-core":55}],199:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfjs_core_1 = require("@tensorflow/tfjs-core");
@@ -24216,7 +24876,7 @@ function disposeScalarCache() {
 }
 exports.disposeScalarCache = disposeScalarCache;
 
-},{"@tensorflow/tfjs-core":55}],191:[function(require,module,exports){
+},{"@tensorflow/tfjs-core":55}],200:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
@@ -24628,7 +25288,7 @@ function inTrainPhase(x, alt, training) {
 }
 exports.inTrainPhase = inTrainPhase;
 
-},{"../backend/state":190,"../common":194,"../errors":201,"../utils/math_utils":231,"./common":189,"@tensorflow/tfjs-core":55}],192:[function(require,module,exports){
+},{"../backend/state":199,"../common":203,"../errors":213,"../utils/math_utils":243,"./common":198,"@tensorflow/tfjs-core":55}],201:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -24681,6 +25341,11 @@ var state_1 = require("./backend/state");
 var errors_1 = require("./errors");
 var logs_1 = require("./logs");
 var generic_utils = require("./utils/generic_utils");
+var ModelLoggingVerbosity;
+(function (ModelLoggingVerbosity) {
+    ModelLoggingVerbosity[ModelLoggingVerbosity["SILENT"] = 0] = "SILENT";
+    ModelLoggingVerbosity[ModelLoggingVerbosity["VERBOSE"] = 1] = "VERBOSE";
+})(ModelLoggingVerbosity = exports.ModelLoggingVerbosity || (exports.ModelLoggingVerbosity = {}));
 var BaseCallback = (function () {
     function BaseCallback() {
         this.validationData = null;
@@ -24834,19 +25499,22 @@ var CallbackList = (function () {
                         if (logs == null) {
                             logs = {};
                         }
-                        _i = 0, _a = this.callbacks;
-                        _b.label = 1;
+                        return [4, logs_1.resolveScalarsInLogs(logs)];
                     case 1:
-                        if (!(_i < _a.length)) return [3, 4];
+                        _b.sent();
+                        _i = 0, _a = this.callbacks;
+                        _b.label = 2;
+                    case 2:
+                        if (!(_i < _a.length)) return [3, 5];
                         callback = _a[_i];
                         return [4, callback.onBatchEnd(batch, logs)];
-                    case 2:
-                        _b.sent();
-                        _b.label = 3;
                     case 3:
+                        _b.sent();
+                        _b.label = 4;
+                    case 4:
                         _i++;
-                        return [3, 1];
-                    case 4: return [2];
+                        return [3, 2];
+                    case 5: return [2];
                 }
             });
         });
@@ -25369,8 +26037,31 @@ var CallbackConstructorRegistry = (function () {
     return CallbackConstructorRegistry;
 }());
 exports.CallbackConstructorRegistry = CallbackConstructorRegistry;
+function configureCallbacks(callbacks, yieldEvery, verbose, epochs, initialEpoch, numTrainSamples, stepsPerEpoch, batchSize, doValidation, callbackMetrics) {
+    var history = new History();
+    var actualCallbacks = [
+        new BaseLogger(yieldEvery)
+    ].concat(CallbackConstructorRegistry.createCallbacks(verbose));
+    if (callbacks != null) {
+        actualCallbacks.push.apply(actualCallbacks, callbacks);
+    }
+    actualCallbacks.push(history);
+    var callbackList = new CallbackList(actualCallbacks);
+    callbackList.setParams({
+        epochs: epochs,
+        initialEpoch: initialEpoch,
+        samples: numTrainSamples,
+        steps: stepsPerEpoch,
+        batchSize: batchSize,
+        verbose: verbose,
+        doValidation: doValidation,
+        metrics: callbackMetrics,
+    });
+    return { callbackList: callbackList, history: history };
+}
+exports.configureCallbacks = configureCallbacks;
 
-},{"./backend/state":190,"./errors":201,"./logs":222,"./utils/generic_utils":229,"@tensorflow/tfjs-core":55}],193:[function(require,module,exports){
+},{"./backend/state":199,"./errors":213,"./logs":234,"./utils/generic_utils":241,"@tensorflow/tfjs-core":55}],202:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -25402,7 +26093,7 @@ var Callback = (function (_super) {
 }(base_callbacks_1.BaseCallback));
 exports.Callback = Callback;
 
-},{"./base_callbacks":192,"./engine/training":200}],194:[function(require,module,exports){
+},{"./base_callbacks":201,"./engine/training":210}],203:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var generic_utils_1 = require("./utils/generic_utils");
@@ -25477,7 +26168,7 @@ function isValidTensorName(name) {
 }
 exports.isValidTensorName = isValidTensorName;
 
-},{"./utils/generic_utils":229}],195:[function(require,module,exports){
+},{"./utils/generic_utils":241}],204:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -25641,7 +26332,7 @@ function getConstraint(identifier) {
 }
 exports.getConstraint = getConstraint;
 
-},{"./backend/common":189,"./backend/state":190,"./utils/generic_utils":229,"@tensorflow/tfjs-core":55}],196:[function(require,module,exports){
+},{"./backend/common":198,"./backend/state":199,"./utils/generic_utils":241,"@tensorflow/tfjs-core":55}],205:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -26574,7 +27265,23 @@ var Container = (function (_super) {
 }(topology_1.Layer));
 exports.Container = Container;
 
-},{"../backend/state":190,"../errors":201,"../layers/serialization":220,"../utils/generic_utils":229,"../utils/serialization_utils":232,"../utils/types_utils":233,"../variables":235,"../version":236,"./input_layer":198,"./topology":199,"@tensorflow/tfjs-core":55}],197:[function(require,module,exports){
+},{"../backend/state":199,"../errors":213,"../layers/serialization":232,"../utils/generic_utils":241,"../utils/serialization_utils":244,"../utils/types_utils":245,"../variables":247,"../version":248,"./input_layer":208,"./topology":209,"@tensorflow/tfjs-core":55}],206:[function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var LazyIterator = (function () {
+    function LazyIterator() {
+    }
+    return LazyIterator;
+}());
+exports.LazyIterator = LazyIterator;
+var Dataset = (function () {
+    function Dataset() {
+    }
+    return Dataset;
+}());
+exports.Dataset = Dataset;
+
+},{}],207:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfjs_core_1 = require("@tensorflow/tfjs-core");
@@ -26708,7 +27415,7 @@ function getNodeOutputs(fetch) {
     return layerOutputs;
 }
 
-},{"../errors":201,"./input_layer":198,"@tensorflow/tfjs-core":55}],198:[function(require,module,exports){
+},{"../errors":213,"./input_layer":208,"@tensorflow/tfjs-core":55}],208:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -26835,7 +27542,7 @@ function Input(config) {
 }
 exports.Input = Input;
 
-},{"../backend/state":190,"../errors":201,"./topology":199,"@tensorflow/tfjs-core":55}],199:[function(require,module,exports){
+},{"../backend/state":199,"../errors":213,"./topology":209,"@tensorflow/tfjs-core":55}],209:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -27523,10 +28230,7 @@ var Layer = (function (_super) {
         if (--this._refCount === 0) {
             numDisposedVariables = this.disposeWeights();
         }
-        return {
-            refCountAfterDispose: this._refCount,
-            numDisposedVariables: numDisposedVariables
-        };
+        return { refCountAfterDispose: this._refCount, numDisposedVariables: numDisposedVariables };
     };
     return Layer;
 }(tfjs_core_1.serialization.Serializable));
@@ -27577,7 +28281,7 @@ function getSourceInputs(tensor, layer, nodeIndex) {
 }
 exports.getSourceInputs = getSourceInputs;
 
-},{"../backend/state":190,"../common":194,"../errors":201,"../utils/generic_utils":229,"../utils/types_utils":233,"../utils/variable_utils":234,"../variables":235,"@tensorflow/tfjs-core":55}],200:[function(require,module,exports){
+},{"../backend/state":199,"../common":203,"../errors":213,"../utils/generic_utils":241,"../utils/types_utils":245,"../utils/variable_utils":246,"../variables":247,"@tensorflow/tfjs-core":55}],210:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -27629,10 +28333,8 @@ var tfc = require("@tensorflow/tfjs-core");
 var tfjs_core_1 = require("@tensorflow/tfjs-core");
 var state_1 = require("../backend/state");
 var K = require("../backend/tfjs_backend");
-var base_callbacks_1 = require("../base_callbacks");
 var common_1 = require("../common");
 var errors_1 = require("../errors");
-var logs_1 = require("../logs");
 var losses = require("../losses");
 var Metrics = require("../metrics");
 var optimizers = require("../optimizers");
@@ -27641,6 +28343,8 @@ var layer_utils_1 = require("../utils/layer_utils");
 var math_utils_1 = require("../utils/math_utils");
 var container_1 = require("./container");
 var executor_1 = require("./executor");
+var training_dataset_1 = require("./training_dataset");
+var training_tensors_1 = require("./training_tensors");
 function isDataTensor(x) {
     return x instanceof tfjs_core_1.Tensor;
 }
@@ -27805,46 +28509,6 @@ function checkLossAndTargetCompatibility(targets, lossFns, outputShapes) {
         }
     }
 }
-function makeBatches(size, batchSize) {
-    var output = [];
-    var batchStart = 0;
-    var batchEnd = null;
-    while (batchStart < size) {
-        batchEnd = batchStart + batchSize;
-        if (batchEnd >= size) {
-            batchEnd = size;
-        }
-        output.push([batchStart, batchEnd]);
-        batchStart = batchEnd;
-    }
-    return output;
-}
-exports.makeBatches = makeBatches;
-function sliceArrays(arrays, start, stop) {
-    if (arrays == null) {
-        return [null];
-    }
-    else if (Array.isArray(arrays)) {
-        return arrays.map(function (array) { return K.sliceAlongFirstAxis(array, start, stop - start); });
-    }
-    else {
-        return K.sliceAlongFirstAxis(arrays, start, stop - start);
-    }
-}
-function sliceArraysByIndices(arrays, indices) {
-    return tfc.tidy(function () {
-        if (arrays == null) {
-            return null;
-        }
-        else if (Array.isArray(arrays)) {
-            return arrays.map(function (array) { return sliceArraysByIndices(array, indices); });
-        }
-        else {
-            return K.gather(arrays, indices.dtype === 'int32' ? indices : indices.toInt());
-        }
-    });
-}
-exports.sliceArraysByIndices = sliceArraysByIndices;
 function checkInputData(data, names, shapes, checkBatchAxis, exceptionPrefix) {
     if (checkBatchAxis === void 0) { checkBatchAxis = true; }
     if (exceptionPrefix === void 0) { exceptionPrefix = ''; }
@@ -27917,14 +28581,6 @@ function collectMetrics(metrics, outputNames) {
         throw new TypeError('Type of metrics argument not understood. Expected an Array or ' +
             'Object, found: ' + metrics);
     }
-}
-var ModelLoggingVerbosity;
-(function (ModelLoggingVerbosity) {
-    ModelLoggingVerbosity[ModelLoggingVerbosity["SILENT"] = 0] = "SILENT";
-    ModelLoggingVerbosity[ModelLoggingVerbosity["VERBOSE"] = 1] = "VERBOSE";
-})(ModelLoggingVerbosity = exports.ModelLoggingVerbosity || (exports.ModelLoggingVerbosity = {}));
-function checkBatchSize(batchSize) {
-    tfc.util.assert(batchSize > 0 && Number.isInteger(batchSize), "batchSize is required to be a positive integer, but got " + batchSize);
 }
 var Model = (function (_super) {
     __extends(Model, _super);
@@ -28115,13 +28771,21 @@ var Model = (function (_super) {
     Model.prototype.evaluate = function (x, y, config) {
         if (config === void 0) { config = {}; }
         var batchSize = config.batchSize == null ? 32 : config.batchSize;
-        checkBatchSize(batchSize);
+        training_tensors_1.checkBatchSize(batchSize);
         var standardizedOuts = this.standardizeUserData(x, y, true, batchSize);
         var ins = standardizedOuts[0].concat(standardizedOuts[1]);
         this.makeTestFunction();
         var f = this.testFunction;
         var testOuts = this.testLoop(f, ins, batchSize, config.verbose, config.steps);
         return generic_utils_1.singletonOrArray(testOuts);
+    };
+    Model.prototype.evaluateDataset = function (dataset, config) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                this.makeTestFunction();
+                return [2, training_dataset_1.evaluateDataset(this, dataset, config)];
+            });
+        });
     };
     Model.prototype.checkNumSamples = function (ins, batchSize, steps, stepsName) {
         if (stepsName === void 0) { stepsName = 'steps'; }
@@ -28226,13 +28890,13 @@ var Model = (function (_super) {
             if (verbose) {
                 throw new errors_1.NotImplementedError('Verbose predictLoop() is not implemented yet.');
             }
-            var batches = makeBatches(numSamples, batchSize);
+            var batches = training_tensors_1.makeBatches(numSamples, batchSize);
             var outs = [];
             var _loop_3 = function (batchIndex) {
                 var batchOuts = tfc.tidy(function () {
                     var batchStart = batches[batchIndex][0];
                     var batchEnd = batches[batchIndex][1];
-                    var insBatch = sliceArrays(ins, batchStart, batchEnd);
+                    var insBatch = training_tensors_1.sliceArrays(ins, batchStart, batchEnd);
                     var feeds = [];
                     if (Array.isArray(insBatch)) {
                         for (var i = 0; i < insBatch.length; ++i) {
@@ -28267,7 +28931,7 @@ var Model = (function (_super) {
         if (config === void 0) { config = {}; }
         checkInputData(x, this.inputNames, this.feedInputShapes, false);
         var batchSize = config.batchSize == null ? 32 : config.batchSize;
-        checkBatchSize(batchSize);
+        training_tensors_1.checkBatchSize(batchSize);
         return this.predictLoop(x, batchSize);
     };
     Model.prototype.predictOnBatch = function (x) {
@@ -28304,203 +28968,26 @@ var Model = (function (_super) {
         }
         return [x, y, null];
     };
-    Model.prototype.fitLoop = function (f, ins, outLabels, batchSize, epochs, verbose, callbacks, valF, valIns, shuffle, callbackMetrics, initialEpoch, stepsPerEpoch, validationSteps, yieldEvery) {
-        return __awaiter(this, void 0, void 0, function () {
-            var _this = this;
-            var doValidation, numTrainSamples, indexArray, actualCallbacks, callbackList, _loop_4, this_1, epoch, state_2;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        if (batchSize == null) {
-                            batchSize = 32;
-                        }
-                        if (epochs == null) {
-                            epochs = 1;
-                        }
-                        if (shuffle == null) {
-                            shuffle = true;
-                        }
-                        if (initialEpoch == null) {
-                            initialEpoch = 0;
-                        }
-                        doValidation = false;
-                        if (valF != null && valIns != null) {
-                            doValidation = true;
-                        }
-                        if (validationSteps != null) {
-                            doValidation = true;
-                            if (stepsPerEpoch == null) {
-                                throw new errors_1.ValueError('Can only use `validationSteps` when doing step-wise training, ' +
-                                    'i.e., `stepsPerEpoch` must be set.');
-                            }
-                        }
-                        numTrainSamples = this.checkNumSamples(ins, batchSize, stepsPerEpoch, 'steps_per_epoch');
-                        if (numTrainSamples != null) {
-                            indexArray = math_utils_1.range(0, numTrainSamples);
-                        }
-                        if (verbose == null) {
-                            verbose = 1;
-                        }
-                        this.history = new base_callbacks_1.History();
-                        actualCallbacks = [
-                            new base_callbacks_1.BaseLogger(yieldEvery)
-                        ].concat(base_callbacks_1.CallbackConstructorRegistry.createCallbacks(verbose));
-                        if (callbacks != null) {
-                            actualCallbacks.push.apply(actualCallbacks, callbacks);
-                        }
-                        actualCallbacks.push(this.history);
-                        callbackList = new base_callbacks_1.CallbackList(actualCallbacks);
-                        callbackList.setModel(this);
-                        callbackList.setParams({
-                            epochs: epochs,
-                            initialEpoch: initialEpoch,
-                            samples: numTrainSamples,
-                            steps: stepsPerEpoch,
-                            batchSize: batchSize,
-                            verbose: verbose,
-                            doValidation: doValidation,
-                            metrics: callbackMetrics,
-                        });
-                        return [4, callbackList.onTrainBegin()];
-                    case 1:
-                        _a.sent();
-                        this.stopTraining_ = false;
-                        _loop_4 = function (epoch) {
-                            var epochLogs, epochIndexArray1D_1, batches_1, _loop_5, batchIndex, state_3;
-                            return __generator(this, function (_a) {
-                                switch (_a.label) {
-                                    case 0: return [4, callbackList.onEpochBegin(epoch)];
-                                    case 1:
-                                        _a.sent();
-                                        epochLogs = {};
-                                        if (!(stepsPerEpoch != null)) return [3, 2];
-                                        throw new errors_1.NotImplementedError('stepsPerEpoch mode is not implemented yet.');
-                                    case 2:
-                                        if (shuffle === 'batch') {
-                                            throw new errors_1.NotImplementedError('batch shuffling is not implemneted yet');
-                                        }
-                                        else if (shuffle) {
-                                            tfjs_core_1.util.shuffle(indexArray);
-                                        }
-                                        epochIndexArray1D_1 = tfjs_core_1.tensor1d(indexArray);
-                                        batches_1 = makeBatches(numTrainSamples, batchSize);
-                                        _loop_5 = function (batchIndex) {
-                                            var batchLogs;
-                                            return __generator(this, function (_a) {
-                                                switch (_a.label) {
-                                                    case 0:
-                                                        batchLogs = {};
-                                                        return [4, callbackList.onBatchBegin(batchIndex, batchLogs)];
-                                                    case 1:
-                                                        _a.sent();
-                                                        tfc.tidy(function () {
-                                                            var batchStart = batches_1[batchIndex][0];
-                                                            var batchEnd = batches_1[batchIndex][1];
-                                                            var batchIds = K.sliceAlongFirstAxis(epochIndexArray1D_1, batchStart, batchEnd - batchStart);
-                                                            batchLogs['batch'] = batchIndex;
-                                                            batchLogs['size'] = batchEnd - batchStart;
-                                                            var insBatch = sliceArraysByIndices(ins, batchIds);
-                                                            var outs = f(insBatch);
-                                                            for (var i = 0; i < outLabels.length; ++i) {
-                                                                var label = outLabels[i];
-                                                                var out = outs[i];
-                                                                batchLogs[label] = out;
-                                                                tfc.keep(out);
-                                                            }
-                                                            if (batchIndex === batches_1.length - 1) {
-                                                                if (doValidation) {
-                                                                    var valOuts = _this.testLoop(valF, valIns, batchSize);
-                                                                    for (var i = 0; i < outLabels.length; ++i) {
-                                                                        var label = outLabels[i];
-                                                                        var out = valOuts[i];
-                                                                        tfc.keep(out);
-                                                                        epochLogs['val_' + label] = out;
-                                                                    }
-                                                                }
-                                                            }
-                                                        });
-                                                        return [4, callbackList.onBatchEnd(batchIndex, batchLogs)];
-                                                    case 2:
-                                                        _a.sent();
-                                                        logs_1.disposeTensorsInLogs(batchLogs);
-                                                        if (this_1.stopTraining_) {
-                                                            return [2, "break"];
-                                                        }
-                                                        return [2];
-                                                }
-                                            });
-                                        };
-                                        batchIndex = 0;
-                                        _a.label = 3;
-                                    case 3:
-                                        if (!(batchIndex < batches_1.length)) return [3, 6];
-                                        return [5, _loop_5(batchIndex)];
-                                    case 4:
-                                        state_3 = _a.sent();
-                                        if (state_3 === "break")
-                                            return [3, 6];
-                                        _a.label = 5;
-                                    case 5:
-                                        ++batchIndex;
-                                        return [3, 3];
-                                    case 6:
-                                        epochIndexArray1D_1.dispose();
-                                        _a.label = 7;
-                                    case 7: return [4, callbackList.onEpochEnd(epoch, epochLogs)];
-                                    case 8:
-                                        _a.sent();
-                                        if (this_1.stopTraining_) {
-                                            return [2, "break"];
-                                        }
-                                        return [2];
-                                }
-                            });
-                        };
-                        this_1 = this;
-                        epoch = initialEpoch;
-                        _a.label = 2;
-                    case 2:
-                        if (!(epoch < epochs)) return [3, 5];
-                        return [5, _loop_4(epoch)];
-                    case 3:
-                        state_2 = _a.sent();
-                        if (state_2 === "break")
-                            return [3, 5];
-                        _a.label = 4;
-                    case 4:
-                        ++epoch;
-                        return [3, 2];
-                    case 5: return [4, callbackList.onTrainEnd()];
-                    case 6:
-                        _a.sent();
-                        return [4, this.history.syncData()];
-                    case 7:
-                        _a.sent();
-                        return [2, this.history];
-                }
-            });
-        });
-    };
     Model.prototype.testLoop = function (f, ins, batchSize, verbose, steps) {
         var _this = this;
         if (verbose === void 0) { verbose = 0; }
         return tfc.tidy(function () {
             var numSamples = _this.checkNumSamples(ins, batchSize, steps, 'steps');
             var outs = [];
-            if (verbose === 1) {
+            if (verbose > 0) {
                 throw new errors_1.NotImplementedError('Verbose mode is not implemented yet.');
             }
             if (steps != null) {
                 throw new errors_1.NotImplementedError('steps mode in testLoop() is not implemented yet');
             }
             else {
-                var batches = makeBatches(numSamples, batchSize);
+                var batches = training_tensors_1.makeBatches(numSamples, batchSize);
                 var indexArray = tfjs_core_1.tensor1d(math_utils_1.range(0, numSamples));
                 for (var batchIndex = 0; batchIndex < batches.length; ++batchIndex) {
                     var batchStart = batches[batchIndex][0];
                     var batchEnd = batches[batchIndex][1];
                     var batchIds = K.sliceAlongFirstAxis(indexArray, batchStart, batchEnd - batchStart);
-                    var insBatch = sliceArraysByIndices(ins, batchIds);
+                    var insBatch = training_tensors_1.sliceArraysByIndices(ins, batchIds);
                     var batchOuts = f(insBatch);
                     if (batchIndex === 0) {
                         for (var i = 0; i < batchOuts.length; ++i) {
@@ -28533,6 +29020,54 @@ var Model = (function (_super) {
             dedupedOutLabels.push(newLabel);
         }
         return dedupedOutLabels;
+    };
+    Model.prototype.makeTrainFunction = function () {
+        var _this = this;
+        return function (data) {
+            var losses = [];
+            var lossValues = [];
+            var inputs = data.slice(0, _this.inputs.length);
+            var targets = data.slice(_this.inputs.length, _this.inputs.length + _this.outputs.length);
+            var metricsValues = [];
+            var totalLossFunction = function () {
+                var feeds = [];
+                for (var i = 0; i < _this.inputs.length; ++i) {
+                    feeds.push({ key: _this.inputs[i], value: inputs[i] });
+                }
+                var feedDict = new executor_1.FeedDict(feeds);
+                var outputs = executor_1.execute(_this.outputs, feedDict, { 'training': true });
+                var totalLoss;
+                for (var i = 0; i < _this.lossFunctions.length; ++i) {
+                    var lossFunction = _this.lossFunctions[i];
+                    var loss = lossFunction(targets[i], outputs[i]);
+                    losses.push(loss);
+                    var meanLoss = tfc.mean(loss);
+                    lossValues.push(meanLoss);
+                    if (i === 0) {
+                        totalLoss = loss;
+                    }
+                    else {
+                        totalLoss = tfc.add(totalLoss, loss);
+                    }
+                }
+                for (var i = 0; i < _this.metricsTensors.length; ++i) {
+                    var metric = _this.metricsTensors[i][0];
+                    var outputIndex = _this.metricsTensors[i][1];
+                    var meanMetric = tfc.mean(metric(targets[outputIndex], outputs[outputIndex]));
+                    tfc.keep(meanMetric);
+                    metricsValues.push(meanMetric);
+                }
+                totalLoss = tfc.mean(totalLoss);
+                _this.calculateLosses().forEach(function (regularizerLoss) {
+                    totalLoss = tfc.add(totalLoss, regularizerLoss);
+                });
+                return totalLoss;
+            };
+            var variables = _this.collectedTrainableWeights.map(function (param) { return param.read(); });
+            var returnCost = true;
+            var totalLossValue = _this.optimizer.minimize(totalLossFunction, returnCost, variables);
+            return [totalLossValue].concat(metricsValues);
+        };
     };
     Model.prototype.makeTestFunction = function () {
         var _this = this;
@@ -28572,139 +29107,15 @@ var Model = (function (_super) {
     Model.prototype.fit = function (x, y, config) {
         if (config === void 0) { config = {}; }
         return __awaiter(this, void 0, void 0, function () {
-            var _this = this;
-            var batchSize, standardizedOuts, inputs, targets, doValidation, valX, valY, valIns, needValidationDisposal, valStandardized, splitAt, originalBatchSize, ins, trainFunction, outLabels, valFunction, callbackMetrics, callbacks, out;
             return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        if (this.isTraining) {
-                            throw new Error('Cannot start training because another fit() call is ongoing.');
-                        }
-                        this.isTraining = true;
-                        _a.label = 1;
-                    case 1:
-                        _a.trys.push([1, , 3, 4]);
-                        batchSize = config.batchSize == null ? 32 : config.batchSize;
-                        checkBatchSize(batchSize);
-                        standardizedOuts = this.standardizeUserData(x, y, false, batchSize);
-                        inputs = standardizedOuts[0];
-                        targets = standardizedOuts[1];
-                        doValidation = false;
-                        valX = void 0;
-                        valY = void 0;
-                        valIns = void 0;
-                        needValidationDisposal = false;
-                        if (config.validationData != null && config.validationData.length > 0) {
-                            doValidation = true;
-                            if (config.validationData.length === 2) {
-                                valX = config.validationData[0];
-                                valY = config.validationData[1];
-                            }
-                            else if (config.validationData.length === 3) {
-                                throw new errors_1.NotImplementedError('validationData including sample weights is not supported yet.');
-                            }
-                            else {
-                                throw new errors_1.ValueError("When passing validation data, it must contain 2 (valX, valY) " +
-                                    "or 3 (valX, valY, valSampleWeight) items; " +
-                                    (config.validationData + " is invalid."));
-                            }
-                            valStandardized = this.standardizeUserData(valX, valY, true, batchSize);
-                            valX = valStandardized[0];
-                            valY = valStandardized[1];
-                            valIns = valX.concat(valY);
-                        }
-                        else if (config.validationSplit != null && config.validationSplit > 0 &&
-                            config.validationSplit < 1) {
-                            doValidation = true;
-                            splitAt = Math.floor(inputs[0].shape[0] * (1 - config.validationSplit));
-                            originalBatchSize = inputs[0].shape[0];
-                            valX = sliceArrays(inputs, splitAt, originalBatchSize);
-                            inputs = sliceArrays(inputs, 0, splitAt);
-                            valY = sliceArrays(targets, splitAt, originalBatchSize);
-                            targets = sliceArrays(targets, 0, splitAt);
-                            needValidationDisposal = true;
-                            valIns = valX.concat(valY);
-                        }
-                        else if (config.validationSteps != null) {
-                            doValidation = true;
-                        }
-                        ins = inputs.concat(targets);
-                        this.checkTrainableWeightsConsistency();
-                        trainFunction = function (data) {
-                            var losses = [];
-                            var lossValues = [];
-                            var inputs = data.slice(0, _this.inputs.length);
-                            var targets = data.slice(_this.inputs.length, _this.inputs.length + _this.outputs.length);
-                            var metricsValues = [];
-                            var totalLossFunction = function () {
-                                var feeds = [];
-                                for (var i = 0; i < _this.inputs.length; ++i) {
-                                    feeds.push({ key: _this.inputs[i], value: inputs[i] });
-                                }
-                                var feedDict = new executor_1.FeedDict(feeds);
-                                var outputs = executor_1.execute(_this.outputs, feedDict, { 'training': true });
-                                var totalLoss;
-                                for (var i = 0; i < _this.lossFunctions.length; ++i) {
-                                    var lossFunction = _this.lossFunctions[i];
-                                    var loss = lossFunction(targets[i], outputs[i]);
-                                    losses.push(loss);
-                                    var meanLoss = tfc.mean(loss);
-                                    lossValues.push(meanLoss);
-                                    if (i === 0) {
-                                        totalLoss = loss;
-                                    }
-                                    else {
-                                        totalLoss = tfc.add(totalLoss, loss);
-                                    }
-                                }
-                                for (var i = 0; i < _this.metricsTensors.length; ++i) {
-                                    var metric = _this.metricsTensors[i][0];
-                                    var outputIndex = _this.metricsTensors[i][1];
-                                    var meanMetric = tfc.mean(metric(targets[outputIndex], outputs[outputIndex]));
-                                    tfc.keep(meanMetric);
-                                    metricsValues.push(meanMetric);
-                                }
-                                totalLoss = tfc.mean(totalLoss);
-                                _this.calculateLosses().forEach(function (regularizerLoss) {
-                                    totalLoss = tfc.add(totalLoss, regularizerLoss);
-                                });
-                                return totalLoss;
-                            };
-                            var variables = _this.collectedTrainableWeights.map(function (param) { return param.read(); });
-                            var returnCost = true;
-                            var totalLossValue = _this.optimizer.minimize(totalLossFunction, returnCost, variables);
-                            return [totalLossValue].concat(metricsValues);
-                        };
-                        outLabels = this.getDedupedMetricsNames();
-                        valFunction = void 0;
-                        callbackMetrics = void 0;
-                        if (doValidation) {
-                            this.makeTestFunction();
-                            valFunction = this.testFunction;
-                            callbackMetrics =
-                                outLabels.slice().concat(outLabels.map(function (n) { return 'val_' + n; }));
-                        }
-                        else {
-                            valFunction = null;
-                            valIns = [];
-                            callbackMetrics = outLabels.slice();
-                        }
-                        callbacks = base_callbacks_1.standardizeCallbacks(config.callbacks);
-                        return [4, this.fitLoop(trainFunction, ins, outLabels, batchSize, config.epochs, config.verbose, callbacks, valFunction, valIns, config.shuffle, callbackMetrics, config.initialEpoch, null, null, config.yieldEvery)];
-                    case 2:
-                        out = _a.sent();
-                        if (needValidationDisposal) {
-                            valIns.forEach(function (tensor) { return tensor.dispose(); });
-                            inputs.forEach(function (tensor) { return tensor.dispose(); });
-                            targets.forEach(function (tensor) { return tensor.dispose(); });
-                        }
-                        this.isTraining = false;
-                        return [2, out];
-                    case 3:
-                        this.isTraining = false;
-                        return [7];
-                    case 4: return [2];
-                }
+                return [2, training_tensors_1.fitTensors(this, x, y, config)];
+            });
+        });
+    };
+    Model.prototype.fitDataset = function (dataset, config) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                return [2, training_dataset_1.fitDataset(this, dataset, config)];
             });
         });
     };
@@ -28770,7 +29181,697 @@ var Model = (function (_super) {
 exports.Model = Model;
 tfjs_core_1.serialization.registerClass(Model);
 
-},{"../backend/state":190,"../backend/tfjs_backend":191,"../base_callbacks":192,"../common":194,"../errors":201,"../logs":222,"../losses":223,"../metrics":224,"../optimizers":226,"../utils/generic_utils":229,"../utils/layer_utils":230,"../utils/math_utils":231,"./container":196,"./executor":197,"@tensorflow/tfjs-core":55}],201:[function(require,module,exports){
+},{"../backend/state":199,"../backend/tfjs_backend":200,"../common":203,"../errors":213,"../losses":235,"../metrics":236,"../optimizers":238,"../utils/generic_utils":241,"../utils/layer_utils":242,"../utils/math_utils":243,"./container":205,"./executor":207,"./training_dataset":211,"./training_tensors":212,"@tensorflow/tfjs-core":55}],211:[function(require,module,exports){
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (this && this.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [0, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+var tfc = require("@tensorflow/tfjs-core");
+var state_1 = require("../backend/state");
+var base_callbacks_1 = require("../base_callbacks");
+var errors_1 = require("../errors");
+var logs_1 = require("../logs");
+var generic_utils_1 = require("../utils/generic_utils");
+var dataset_stub_1 = require("./dataset_stub");
+var DEFAULT_VALIDATION_BATCH_SIZE = 32;
+function standardizeDataIteratorOutput(model, iteratorOut) {
+    if (model.outputs.length > 1) {
+        throw new errors_1.NotImplementedError("Support for training a model with multiple output tensors with " +
+            "a dataset object is not implemented yet.");
+    }
+    tfc.util.assert(Array.isArray(iteratorOut) && iteratorOut.length === 2, 'Dataset iterator for fitDataset() is expected to generate ' +
+        'an Array of length 2: `[xs, ys]`, but instead generates ' +
+        iteratorOut);
+    iteratorOut = iteratorOut;
+    var ys = iteratorOut[1];
+    var xs = iteratorOut[0];
+    if (xs instanceof tfc.Tensor) {
+        tfc.util.assert(model.inputs.length === 1, "Model has multiple " + model.inputs.length + " inputs, hence it " +
+            "expects the input dataset to generate a dictionary of tensors " +
+            (" (with keys " + JSON.stringify(model.inputNames) + ", ") +
+            "but received a single tensor.");
+        tfc.util.assert(xs.shape[0] === ys.shape[0], "Mismatch in batch size between x and y tensors (" + xs.shape[0] + " vs. " +
+            (ys.shape[0] + ")"));
+        return [xs, ys];
+    }
+    else {
+        var batchSize = void 0;
+        xs = xs;
+        var flattendXs = [];
+        for (var _i = 0, _a = model.inputNames; _i < _a.length; _i++) {
+            var inputName = _a[_i];
+            if (xs[inputName] == null) {
+                throw new errors_1.ValueError("The feature data generated by the dataset lacks the required " +
+                    ("input key '" + inputName + "'."));
+            }
+            flattendXs.push(xs[inputName]);
+            if (batchSize == null) {
+                batchSize = xs[inputName].shape[0];
+            }
+            else {
+                tfc.util.assert(xs[inputName].shape[0] === batchSize, "Mismatch in batch size between x and y tensors " +
+                    ("(" + xs[inputName].shape[0] + " vs. " + ys.shape[0] + ")"));
+            }
+        }
+        return flattendXs.concat(ys);
+    }
+}
+function standardizeTensorValidationData(data) {
+    if (data.length === 3) {
+        throw new errors_1.NotImplementedError('Validation with sample weights is not implemented yet.');
+    }
+    return { xs: data[0], ys: data[1] };
+}
+function fitDataset(model, dataset, config) {
+    return __awaiter(this, void 0, void 0, function () {
+        var doValidation, validationDataIterator, valXs, valYs, validationData, trainFunction, outLabels, callbackMetrics, callbacks, _a, callbackList, history_1, epoch, epochLogs, dataIterator, stepsDone, batchIndex, iteratorOut, xsAndYs, batchLogs, outs, i, label, out, valOuts, _b, i;
+        return __generator(this, function (_c) {
+            switch (_c.label) {
+                case 0:
+                    tfc.util.assert(model.optimizer != null, 'You must compile a model before training/testing. Use ' +
+                        'Model.compile(modelCompileConfig).');
+                    tfc.util.assert(config != null, "For fitDataset(), the 2nd argument (config) is required, " +
+                        "but it is not provided in this call.");
+                    tfc.util.assert(config.epochs != null && config.epochs > 0 &&
+                        Number.isInteger(config.epochs), "For fitDataset(), config.epochs is expected to be a positive " +
+                        ("integer, but got " + config.epochs));
+                    tfc.util.assert(config.batchesPerEpoch != null && config.batchesPerEpoch > 0 &&
+                        Number.isInteger(config.batchesPerEpoch), "For fitDataset(), config.batchesPerEpoch is expected to be a " +
+                        ("positive integer, but got " + config.batchesPerEpoch));
+                    if (model.isTraining) {
+                        throw new Error('Cannot start training because another fit() call is ongoing.');
+                    }
+                    model.isTraining = true;
+                    _c.label = 1;
+                case 1:
+                    _c.trys.push([1, , 21, 22]);
+                    doValidation = config.validationData != null;
+                    validationDataIterator = void 0;
+                    valXs = void 0;
+                    valYs = void 0;
+                    if (!doValidation) return [3, 4];
+                    if (!(config.validationData instanceof dataset_stub_1.Dataset)) return [3, 3];
+                    tfc.util.assert(config.validationBatches > 0 &&
+                        Number.isInteger(config.validationBatches), "For fitDataset() with dataset-based validation, " +
+                        "config.validationBatches is expected to be a " +
+                        ("positive integer, but got " + config.validationBatches));
+                    return [4, config.validationData.iterator()];
+                case 2:
+                    validationDataIterator = _c.sent();
+                    return [3, 4];
+                case 3:
+                    validationData = standardizeTensorValidationData(config.validationData);
+                    valXs = validationData.xs;
+                    valYs = validationData.ys;
+                    _c.label = 4;
+                case 4:
+                    trainFunction = model.makeTrainFunction();
+                    outLabels = model.getDedupedMetricsNames();
+                    callbackMetrics = void 0;
+                    if (doValidation) {
+                        callbackMetrics =
+                            outLabels.slice().concat(outLabels.map(function (n) { return 'val_' + n; }));
+                    }
+                    else {
+                        callbackMetrics = outLabels.slice();
+                    }
+                    callbacks = base_callbacks_1.standardizeCallbacks(config.callbacks);
+                    _a = base_callbacks_1.configureCallbacks(callbacks, config.yieldEvery, config.verbose, config.epochs, null, null, config.batchesPerEpoch, null, doValidation, callbackMetrics), callbackList = _a.callbackList, history_1 = _a.history;
+                    model.history = history_1;
+                    return [4, callbackList.onTrainBegin()];
+                case 5:
+                    _c.sent();
+                    epoch = config.initialEpoch == null ? 0 : config.initialEpoch;
+                    epochLogs = {};
+                    return [4, dataset.iterator()];
+                case 6:
+                    dataIterator = _c.sent();
+                    _c.label = 7;
+                case 7:
+                    if (!(epoch < config.epochs)) return [3, 18];
+                    return [4, callbackList.onEpochBegin(epoch)];
+                case 8:
+                    _c.sent();
+                    stepsDone = 0;
+                    batchIndex = 0;
+                    _c.label = 9;
+                case 9:
+                    if (!(stepsDone < config.batchesPerEpoch)) return [3, 16];
+                    return [4, dataIterator.next()];
+                case 10:
+                    iteratorOut = _c.sent();
+                    if (iteratorOut.done) {
+                        console.warn('Your dataset iterator ran out of data; ' +
+                            'interrupting training. Make sure that your ' +
+                            'dataset can generate at least `batchesPerEpoch * epochs` ' +
+                            'batches (in this case, ' +
+                            (config.batchesPerEpoch * config.epochs + " batches). ") +
+                            'You may need to use the repeat() function when building ' +
+                            'your dataset.');
+                        return [3, 16];
+                    }
+                    xsAndYs = standardizeDataIteratorOutput(model, iteratorOut.value);
+                    batchLogs = {};
+                    batchLogs['batch'] = batchIndex;
+                    batchLogs['size'] = xsAndYs[0].shape[0];
+                    callbackList.onBatchBegin(batchIndex, batchLogs);
+                    outs = trainFunction(xsAndYs);
+                    tfc.dispose(xsAndYs);
+                    for (i = 0; i < outLabels.length; ++i) {
+                        label = outLabels[i];
+                        out = outs[i];
+                        batchLogs[label] = out;
+                        tfc.keep(out);
+                    }
+                    return [4, callbackList.onBatchEnd(batchIndex, batchLogs)];
+                case 11:
+                    _c.sent();
+                    logs_1.disposeTensorsInLogs(batchLogs);
+                    batchIndex++;
+                    stepsDone++;
+                    if (!(stepsDone >= config.batchesPerEpoch && doValidation)) return [3, 15];
+                    valOuts = void 0;
+                    if (!(config.validationData instanceof dataset_stub_1.Dataset)) return [3, 13];
+                    _b = generic_utils_1.toList;
+                    return [4, model.evaluateDataset(validationDataIterator, { batches: config.validationBatches })];
+                case 12:
+                    valOuts = _b.apply(void 0, [_c.sent()]);
+                    return [3, 14];
+                case 13:
+                    valOuts = generic_utils_1.toList(model.evaluate(valXs, valYs, {
+                        batchSize: config.validationBatchSize == null ?
+                            DEFAULT_VALIDATION_BATCH_SIZE :
+                            config.validationBatchSize,
+                        verbose: 0
+                    }));
+                    _c.label = 14;
+                case 14:
+                    for (i = 0; i < model.metricsNames.length; ++i) {
+                        epochLogs["val_" + model.metricsNames[i]] = valOuts[i];
+                    }
+                    _c.label = 15;
+                case 15:
+                    if (model.stopTraining_) {
+                        return [3, 16];
+                    }
+                    return [3, 9];
+                case 16: return [4, callbackList.onEpochEnd(epoch, epochLogs)];
+                case 17:
+                    _c.sent();
+                    epoch++;
+                    if (model.stopTraining_) {
+                        return [3, 18];
+                    }
+                    return [3, 7];
+                case 18: return [4, callbackList.onTrainEnd()];
+                case 19:
+                    _c.sent();
+                    return [4, model.history.syncData()];
+                case 20:
+                    _c.sent();
+                    return [2, model.history];
+                case 21:
+                    model.isTraining = false;
+                    return [7];
+                case 22: return [2];
+            }
+        });
+    });
+}
+exports.fitDataset = fitDataset;
+function evaluateDataset(model, dataset, config) {
+    return __awaiter(this, void 0, void 0, function () {
+        var f, outs, dataIterator, _a, numExamples, _loop_1, batch, state_2, _loop_2, i;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    f = model.testFunction;
+                    outs = [];
+                    if (config.verbose > 0) {
+                        throw new errors_1.NotImplementedError('Verbose mode is not implemented yet.');
+                    }
+                    tfc.util.assert(config.batches > 0 && Number.isInteger(config.batches), 'Test loop expects `batches` to be a positive integer, but ' +
+                        ("received " + JSON.stringify(config.batches)));
+                    if (!(dataset instanceof dataset_stub_1.LazyIterator)) return [3, 1];
+                    _a = dataset;
+                    return [3, 3];
+                case 1: return [4, dataset.iterator()];
+                case 2:
+                    _a = _b.sent();
+                    _b.label = 3;
+                case 3:
+                    dataIterator = _a;
+                    numExamples = 0;
+                    _loop_1 = function (batch) {
+                        var iteratorOut, xsAndYs, batchOuts, i, batchSize, _loop_3, i;
+                        return __generator(this, function (_a) {
+                            switch (_a.label) {
+                                case 0: return [4, dataIterator.next()];
+                                case 1:
+                                    iteratorOut = _a.sent();
+                                    if (iteratorOut.done) {
+                                        console.warn('Your dataset iterator ran out of data during evaluateDataset(). ' +
+                                            'Interrupting evalution. Make sure that your ' +
+                                            'dataset can generate at least `batches` ' +
+                                            ("batches (in this case, " + config.batches + " batches). ") +
+                                            'You may need to use the repeat() function when building ' +
+                                            'your dataset.');
+                                        return [2, "break"];
+                                    }
+                                    xsAndYs = standardizeDataIteratorOutput(model, iteratorOut.value);
+                                    batchOuts = tfc.tidy(function () { return f(xsAndYs); });
+                                    tfc.dispose(xsAndYs);
+                                    if (batch === 0) {
+                                        for (i = 0; i < batchOuts.length; ++i) {
+                                            outs.push(state_1.getScalar(0));
+                                        }
+                                    }
+                                    batchSize = xsAndYs[0].shape[0];
+                                    _loop_3 = function (i) {
+                                        var batchOut = batchOuts[i];
+                                        var oldScalar = outs[i];
+                                        outs[i] = tfc.tidy(function () { return tfc.add(outs[i], tfc.mul(state_1.getScalar(batchSize), batchOut)); });
+                                        if (batch > 0) {
+                                            tfc.dispose(oldScalar);
+                                        }
+                                    };
+                                    for (i = 0; i < batchOuts.length; ++i) {
+                                        _loop_3(i);
+                                    }
+                                    tfc.dispose(batchOuts);
+                                    numExamples += batchSize;
+                                    return [2];
+                            }
+                        });
+                    };
+                    batch = 0;
+                    _b.label = 4;
+                case 4:
+                    if (!(batch < config.batches)) return [3, 7];
+                    return [5, _loop_1(batch)];
+                case 5:
+                    state_2 = _b.sent();
+                    if (state_2 === "break")
+                        return [3, 7];
+                    _b.label = 6;
+                case 6:
+                    ++batch;
+                    return [3, 4];
+                case 7:
+                    _loop_2 = function (i) {
+                        var oldScalar = outs[i];
+                        outs[i] =
+                            tfc.tidy(function () { return tfc.div(outs[i], state_1.getScalar(numExamples)); });
+                        tfc.dispose(oldScalar);
+                    };
+                    for (i = 0; i < outs.length; ++i) {
+                        _loop_2(i);
+                    }
+                    return [2, generic_utils_1.singletonOrArray(outs)];
+            }
+        });
+    });
+}
+exports.evaluateDataset = evaluateDataset;
+
+},{"../backend/state":199,"../base_callbacks":201,"../errors":213,"../logs":234,"../utils/generic_utils":241,"./dataset_stub":206,"@tensorflow/tfjs-core":55}],212:[function(require,module,exports){
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (this && this.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = y[op[0] & 2 ? "return" : op[0] ? "throw" : "next"]) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [0, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+var tfc = require("@tensorflow/tfjs-core");
+var tfjs_core_1 = require("@tensorflow/tfjs-core");
+var tfjs_backend_1 = require("../backend/tfjs_backend");
+var base_callbacks_1 = require("../base_callbacks");
+var errors_1 = require("../errors");
+var logs_1 = require("../logs");
+var math_utils_1 = require("../utils/math_utils");
+function checkBatchSize(batchSize) {
+    tfc.util.assert(batchSize > 0 && Number.isInteger(batchSize), "batchSize is required to be a positive integer, but got " + batchSize);
+}
+exports.checkBatchSize = checkBatchSize;
+function sliceArrays(arrays, start, stop) {
+    if (arrays == null) {
+        return [null];
+    }
+    else if (Array.isArray(arrays)) {
+        return arrays.map(function (array) { return tfjs_backend_1.sliceAlongFirstAxis(array, start, stop - start); });
+    }
+    else {
+        return tfjs_backend_1.sliceAlongFirstAxis(arrays, start, stop - start);
+    }
+}
+exports.sliceArrays = sliceArrays;
+function sliceArraysByIndices(arrays, indices) {
+    return tfc.tidy(function () {
+        if (arrays == null) {
+            return null;
+        }
+        else if (Array.isArray(arrays)) {
+            return arrays.map(function (array) { return sliceArraysByIndices(array, indices); });
+        }
+        else {
+            return tfjs_backend_1.gather(arrays, indices.dtype === 'int32' ? indices : indices.toInt());
+        }
+    });
+}
+exports.sliceArraysByIndices = sliceArraysByIndices;
+function makeBatches(size, batchSize) {
+    var output = [];
+    var batchStart = 0;
+    var batchEnd = null;
+    while (batchStart < size) {
+        batchEnd = batchStart + batchSize;
+        if (batchEnd >= size) {
+            batchEnd = size;
+        }
+        output.push([batchStart, batchEnd]);
+        batchStart = batchEnd;
+    }
+    return output;
+}
+exports.makeBatches = makeBatches;
+function fitLoop(model, f, ins, outLabels, batchSize, epochs, verbose, callbacks, valF, valIns, shuffle, callbackMetrics, initialEpoch, stepsPerEpoch, validationSteps, yieldEvery) {
+    return __awaiter(this, void 0, void 0, function () {
+        var doValidation, numTrainSamples, indexArray, _a, callbackList, history, _loop_1, epoch, state_1;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
+                case 0:
+                    if (batchSize == null) {
+                        batchSize = 32;
+                    }
+                    if (epochs == null) {
+                        epochs = 1;
+                    }
+                    if (shuffle == null) {
+                        shuffle = true;
+                    }
+                    if (initialEpoch == null) {
+                        initialEpoch = 0;
+                    }
+                    doValidation = false;
+                    if (valF != null && valIns != null) {
+                        doValidation = true;
+                    }
+                    if (validationSteps != null) {
+                        doValidation = true;
+                        if (stepsPerEpoch == null) {
+                            throw new errors_1.ValueError('Can only use `validationSteps` when doing step-wise training, ' +
+                                'i.e., `stepsPerEpoch` must be set.');
+                        }
+                    }
+                    numTrainSamples = model.checkNumSamples(ins, batchSize, stepsPerEpoch, 'steps_per_epoch');
+                    if (numTrainSamples != null) {
+                        indexArray = math_utils_1.range(0, numTrainSamples);
+                    }
+                    if (verbose == null) {
+                        verbose = 1;
+                    }
+                    _a = base_callbacks_1.configureCallbacks(callbacks, yieldEvery, verbose, epochs, initialEpoch, numTrainSamples, stepsPerEpoch, batchSize, doValidation, callbackMetrics), callbackList = _a.callbackList, history = _a.history;
+                    callbackList.setModel(model);
+                    model.history = history;
+                    return [4, callbackList.onTrainBegin()];
+                case 1:
+                    _b.sent();
+                    model.stopTraining_ = false;
+                    _loop_1 = function (epoch) {
+                        var epochLogs, epochIndexArray1D_1, batches_1, _loop_2, batchIndex, state_2;
+                        return __generator(this, function (_a) {
+                            switch (_a.label) {
+                                case 0: return [4, callbackList.onEpochBegin(epoch)];
+                                case 1:
+                                    _a.sent();
+                                    epochLogs = {};
+                                    if (!(stepsPerEpoch != null)) return [3, 2];
+                                    throw new errors_1.NotImplementedError('stepsPerEpoch mode is not implemented yet.');
+                                case 2:
+                                    if (shuffle === 'batch') {
+                                        throw new errors_1.NotImplementedError('batch shuffling is not implemneted yet');
+                                    }
+                                    else if (shuffle) {
+                                        tfjs_core_1.util.shuffle(indexArray);
+                                    }
+                                    epochIndexArray1D_1 = tfjs_core_1.tensor1d(indexArray);
+                                    batches_1 = makeBatches(numTrainSamples, batchSize);
+                                    _loop_2 = function (batchIndex) {
+                                        var batchLogs;
+                                        return __generator(this, function (_a) {
+                                            switch (_a.label) {
+                                                case 0:
+                                                    batchLogs = {};
+                                                    return [4, callbackList.onBatchBegin(batchIndex, batchLogs)];
+                                                case 1:
+                                                    _a.sent();
+                                                    tfc.tidy(function () {
+                                                        var batchStart = batches_1[batchIndex][0];
+                                                        var batchEnd = batches_1[batchIndex][1];
+                                                        var batchIds = tfjs_backend_1.sliceAlongFirstAxis(epochIndexArray1D_1, batchStart, batchEnd - batchStart);
+                                                        batchLogs['batch'] = batchIndex;
+                                                        batchLogs['size'] = batchEnd - batchStart;
+                                                        var insBatch = sliceArraysByIndices(ins, batchIds);
+                                                        var outs = f(insBatch);
+                                                        for (var i = 0; i < outLabels.length; ++i) {
+                                                            var label = outLabels[i];
+                                                            var out = outs[i];
+                                                            batchLogs[label] = out;
+                                                            tfc.keep(out);
+                                                        }
+                                                        if (batchIndex === batches_1.length - 1) {
+                                                            if (doValidation) {
+                                                                var valOuts = model.testLoop(valF, valIns, batchSize);
+                                                                for (var i = 0; i < outLabels.length; ++i) {
+                                                                    var label = outLabels[i];
+                                                                    var out = valOuts[i];
+                                                                    tfc.keep(out);
+                                                                    epochLogs['val_' + label] = out;
+                                                                }
+                                                            }
+                                                        }
+                                                    });
+                                                    return [4, callbackList.onBatchEnd(batchIndex, batchLogs)];
+                                                case 2:
+                                                    _a.sent();
+                                                    logs_1.disposeTensorsInLogs(batchLogs);
+                                                    if (model.stopTraining_) {
+                                                        return [2, "break"];
+                                                    }
+                                                    return [2];
+                                            }
+                                        });
+                                    };
+                                    batchIndex = 0;
+                                    _a.label = 3;
+                                case 3:
+                                    if (!(batchIndex < batches_1.length)) return [3, 6];
+                                    return [5, _loop_2(batchIndex)];
+                                case 4:
+                                    state_2 = _a.sent();
+                                    if (state_2 === "break")
+                                        return [3, 6];
+                                    _a.label = 5;
+                                case 5:
+                                    ++batchIndex;
+                                    return [3, 3];
+                                case 6:
+                                    epochIndexArray1D_1.dispose();
+                                    _a.label = 7;
+                                case 7: return [4, callbackList.onEpochEnd(epoch, epochLogs)];
+                                case 8:
+                                    _a.sent();
+                                    if (model.stopTraining_) {
+                                        return [2, "break"];
+                                    }
+                                    return [2];
+                            }
+                        });
+                    };
+                    epoch = initialEpoch;
+                    _b.label = 2;
+                case 2:
+                    if (!(epoch < epochs)) return [3, 5];
+                    return [5, _loop_1(epoch)];
+                case 3:
+                    state_1 = _b.sent();
+                    if (state_1 === "break")
+                        return [3, 5];
+                    _b.label = 4;
+                case 4:
+                    ++epoch;
+                    return [3, 2];
+                case 5: return [4, callbackList.onTrainEnd()];
+                case 6:
+                    _b.sent();
+                    return [4, model.history.syncData()];
+                case 7:
+                    _b.sent();
+                    return [2, model.history];
+            }
+        });
+    });
+}
+function fitTensors(model, x, y, config) {
+    if (config === void 0) { config = {}; }
+    return __awaiter(this, void 0, void 0, function () {
+        var batchSize, standardizedOuts, inputs, targets, doValidation, valX, valY, valIns, needValidationDisposal, valStandardized, splitAt, originalBatchSize, ins, trainFunction, outLabels, valFunction, callbackMetrics, callbacks, out;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    if (model.isTraining) {
+                        throw new Error('Cannot start training because another fit() call is ongoing.');
+                    }
+                    model.isTraining = true;
+                    _a.label = 1;
+                case 1:
+                    _a.trys.push([1, , 3, 4]);
+                    batchSize = config.batchSize == null ? 32 : config.batchSize;
+                    checkBatchSize(batchSize);
+                    standardizedOuts = model.standardizeUserData(x, y, false, batchSize);
+                    inputs = standardizedOuts[0];
+                    targets = standardizedOuts[1];
+                    doValidation = false;
+                    valX = void 0;
+                    valY = void 0;
+                    valIns = void 0;
+                    needValidationDisposal = false;
+                    if (config.validationData != null && config.validationData.length > 0) {
+                        doValidation = true;
+                        if (config.validationData.length === 2) {
+                            valX = config.validationData[0];
+                            valY = config.validationData[1];
+                        }
+                        else if (config.validationData.length === 3) {
+                            throw new errors_1.NotImplementedError('validationData including sample weights is not supported yet.');
+                        }
+                        else {
+                            throw new errors_1.ValueError("When passing validation data, it must contain 2 (valX, valY) " +
+                                "or 3 (valX, valY, valSampleWeight) items; " +
+                                (config.validationData + " is invalid."));
+                        }
+                        valStandardized = model.standardizeUserData(valX, valY, true, batchSize);
+                        valX = valStandardized[0];
+                        valY = valStandardized[1];
+                        valIns = valX.concat(valY);
+                    }
+                    else if (config.validationSplit != null && config.validationSplit > 0 &&
+                        config.validationSplit < 1) {
+                        doValidation = true;
+                        splitAt = Math.floor(inputs[0].shape[0] * (1 - config.validationSplit));
+                        originalBatchSize = inputs[0].shape[0];
+                        valX = sliceArrays(inputs, splitAt, originalBatchSize);
+                        inputs = sliceArrays(inputs, 0, splitAt);
+                        valY = sliceArrays(targets, splitAt, originalBatchSize);
+                        targets = sliceArrays(targets, 0, splitAt);
+                        needValidationDisposal = true;
+                        valIns = valX.concat(valY);
+                    }
+                    else if (config.validationSteps != null) {
+                        doValidation = true;
+                    }
+                    ins = inputs.concat(targets);
+                    model.checkTrainableWeightsConsistency();
+                    trainFunction = model.makeTrainFunction();
+                    outLabels = model.getDedupedMetricsNames();
+                    valFunction = void 0;
+                    callbackMetrics = void 0;
+                    if (doValidation) {
+                        model.makeTestFunction();
+                        valFunction = model.testFunction;
+                        callbackMetrics =
+                            outLabels.slice().concat(outLabels.map(function (n) { return 'val_' + n; }));
+                    }
+                    else {
+                        valFunction = null;
+                        valIns = [];
+                        callbackMetrics = outLabels.slice();
+                    }
+                    callbacks = base_callbacks_1.standardizeCallbacks(config.callbacks);
+                    return [4, fitLoop(model, trainFunction, ins, outLabels, batchSize, config.epochs, config.verbose, callbacks, valFunction, valIns, config.shuffle, callbackMetrics, config.initialEpoch, null, null, config.yieldEvery)];
+                case 2:
+                    out = _a.sent();
+                    if (needValidationDisposal) {
+                        valIns.forEach(function (tensor) { return tensor.dispose(); });
+                        inputs.forEach(function (tensor) { return tensor.dispose(); });
+                        targets.forEach(function (tensor) { return tensor.dispose(); });
+                    }
+                    model.isTraining = false;
+                    return [2, out];
+                case 3:
+                    model.isTraining = false;
+                    return [7];
+                case 4: return [2];
+            }
+        });
+    });
+}
+exports.fitTensors = fitTensors;
+
+},{"../backend/tfjs_backend":200,"../base_callbacks":201,"../errors":213,"../logs":234,"../utils/math_utils":243,"@tensorflow/tfjs-core":55}],213:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -28844,7 +29945,7 @@ var IndexError = (function (_super) {
 }(Error));
 exports.IndexError = IndexError;
 
-},{}],202:[function(require,module,exports){
+},{}],214:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var input_layer_1 = require("./engine/input_layer");
@@ -28873,7 +29974,7 @@ function registerCallbackConstructor(verbosityLevel, callbackConstructor) {
 }
 exports.registerCallbackConstructor = registerCallbackConstructor;
 
-},{"./base_callbacks":192,"./engine/input_layer":198,"./engine/training":200,"./models":225}],203:[function(require,module,exports){
+},{"./base_callbacks":201,"./engine/input_layer":208,"./engine/training":210,"./models":237}],215:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var constraints_1 = require("./constraints");
@@ -28894,7 +29995,7 @@ function minMaxNorm(config) {
 }
 exports.minMaxNorm = minMaxNorm;
 
-},{"./constraints":195}],204:[function(require,module,exports){
+},{"./constraints":204}],216:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var initializers_1 = require("./initializers");
@@ -28951,7 +30052,7 @@ function orthogonal(config) {
 }
 exports.orthogonal = orthogonal;
 
-},{"./initializers":209}],205:[function(require,module,exports){
+},{"./initializers":221}],217:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var input_layer_1 = require("./engine/input_layer");
@@ -29080,6 +30181,10 @@ function multiply(config) {
     return new merge_1.Multiply(config);
 }
 exports.multiply = multiply;
+function dot(config) {
+    return new merge_1.Dot(config);
+}
+exports.dot = dot;
 function batchNormalization(config) {
     return new normalization_1.BatchNormalization(config);
 }
@@ -29181,7 +30286,7 @@ exports.globalMaxPool2d = globalMaxPooling2d;
 exports.maxPool1d = maxPooling1d;
 exports.maxPool2d = maxPooling2d;
 
-},{"./engine/input_layer":198,"./engine/topology":199,"./exports":202,"./layers/advanced_activations":210,"./layers/convolutional":211,"./layers/convolutional_depthwise":212,"./layers/core":213,"./layers/embeddings":214,"./layers/merge":215,"./layers/normalization":216,"./layers/padding":217,"./layers/pooling":218,"./layers/recurrent":219,"./layers/wrappers":221}],206:[function(require,module,exports){
+},{"./engine/input_layer":208,"./engine/topology":209,"./exports":214,"./layers/advanced_activations":222,"./layers/convolutional":223,"./layers/convolutional_depthwise":224,"./layers/core":225,"./layers/embeddings":226,"./layers/merge":227,"./layers/normalization":228,"./layers/padding":229,"./layers/pooling":230,"./layers/recurrent":231,"./layers/wrappers":233}],218:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var losses = require("./losses");
@@ -29243,7 +30348,7 @@ function mse(yTrue, yPred) {
 }
 exports.mse = mse;
 
-},{"./losses":223,"./metrics":224}],207:[function(require,module,exports){
+},{"./losses":235,"./metrics":236}],219:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var regularizers = require("./regularizers");
@@ -29261,7 +30366,7 @@ function l2(config) {
 }
 exports.l2 = l2;
 
-},{"./regularizers":227}],208:[function(require,module,exports){
+},{"./regularizers":239}],220:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var constraints = require("./exports_constraints");
@@ -29281,6 +30386,7 @@ exports.History = base_callbacks_1.History;
 var callbacks_1 = require("./callbacks");
 exports.Callback = callbacks_1.Callback;
 var topology_1 = require("./engine/topology");
+exports.InputSpec = topology_1.InputSpec;
 exports.SymbolicTensor = topology_1.SymbolicTensor;
 var training_1 = require("./engine/training");
 exports.Model = training_1.Model;
@@ -29299,7 +30405,7 @@ exports.LayerVariable = variables_1.LayerVariable;
 var version_1 = require("./version");
 exports.version_layers = version_1.version;
 
-},{"./base_callbacks":192,"./callbacks":193,"./engine/topology":199,"./engine/training":200,"./exports":202,"./exports_constraints":203,"./exports_initializers":204,"./exports_layers":205,"./exports_metrics":206,"./exports_regularizers":207,"./layers/recurrent":219,"./models":225,"./variables":235,"./version":236}],209:[function(require,module,exports){
+},{"./base_callbacks":201,"./callbacks":202,"./engine/topology":209,"./engine/training":210,"./exports":214,"./exports_constraints":215,"./exports_initializers":216,"./exports_layers":217,"./exports_metrics":218,"./exports_regularizers":219,"./layers/recurrent":231,"./models":237,"./variables":247,"./version":248}],221:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -29741,7 +30847,7 @@ function getInitializer(identifier) {
 }
 exports.getInitializer = getInitializer;
 
-},{"./backend/state":190,"./backend/tfjs_backend":191,"./common":194,"./errors":201,"./utils/generic_utils":229,"./utils/math_utils":231,"@tensorflow/tfjs-core":55}],210:[function(require,module,exports){
+},{"./backend/state":199,"./backend/tfjs_backend":200,"./common":203,"./errors":213,"./utils/generic_utils":241,"./utils/math_utils":243,"@tensorflow/tfjs-core":55}],222:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -29916,7 +31022,7 @@ var Softmax = (function (_super) {
 exports.Softmax = Softmax;
 tfjs_core_1.serialization.registerClass(Softmax);
 
-},{"../activations":188,"../backend/state":190,"../backend/tfjs_backend":191,"../engine/topology":199,"../errors":201,"../utils/types_utils":233,"@tensorflow/tfjs-core":55}],211:[function(require,module,exports){
+},{"../activations":197,"../backend/state":199,"../backend/tfjs_backend":200,"../engine/topology":209,"../errors":213,"../utils/types_utils":245,"@tensorflow/tfjs-core":55}],223:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -30615,7 +31721,7 @@ var UpSampling2D = (function (_super) {
 exports.UpSampling2D = UpSampling2D;
 tfjs_core_1.serialization.registerClass(UpSampling2D);
 
-},{"../activations":188,"../backend/common":189,"../backend/tfjs_backend":191,"../common":194,"../constraints":195,"../engine/topology":199,"../errors":201,"../initializers":209,"../regularizers":227,"../utils/conv_utils":228,"../utils/generic_utils":229,"../utils/types_utils":233,"@tensorflow/tfjs-core":55}],212:[function(require,module,exports){
+},{"../activations":197,"../backend/common":198,"../backend/tfjs_backend":200,"../common":203,"../constraints":204,"../engine/topology":209,"../errors":213,"../initializers":221,"../regularizers":239,"../utils/conv_utils":240,"../utils/generic_utils":241,"../utils/types_utils":245,"@tensorflow/tfjs-core":55}],224:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -30748,7 +31854,7 @@ var DepthwiseConv2D = (function (_super) {
 exports.DepthwiseConv2D = DepthwiseConv2D;
 tfjs_core_1.serialization.registerClass(DepthwiseConv2D);
 
-},{"../backend/common":189,"../backend/tfjs_backend":191,"../common":194,"../constraints":195,"../errors":201,"../initializers":209,"../regularizers":227,"../utils/conv_utils":228,"../utils/types_utils":233,"./convolutional":211,"@tensorflow/tfjs-core":55}],213:[function(require,module,exports){
+},{"../backend/common":198,"../backend/tfjs_backend":200,"../common":203,"../constraints":204,"../errors":213,"../initializers":221,"../regularizers":239,"../utils/conv_utils":240,"../utils/types_utils":245,"./convolutional":223,"@tensorflow/tfjs-core":55}],225:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -31143,7 +32249,7 @@ var Permute = (function (_super) {
 exports.Permute = Permute;
 tfjs_core_1.serialization.registerClass(Permute);
 
-},{"../activations":188,"../backend/state":190,"../backend/tfjs_backend":191,"../constraints":195,"../engine/topology":199,"../errors":201,"../initializers":209,"../regularizers":227,"../utils/math_utils":231,"../utils/types_utils":233,"@tensorflow/tfjs-core":55}],214:[function(require,module,exports){
+},{"../activations":197,"../backend/state":199,"../backend/tfjs_backend":200,"../constraints":204,"../engine/topology":209,"../errors":213,"../initializers":221,"../regularizers":239,"../utils/math_utils":243,"../utils/types_utils":245,"@tensorflow/tfjs-core":55}],226:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -31262,7 +32368,7 @@ var Embedding = (function (_super) {
 exports.Embedding = Embedding;
 tfjs_core_1.serialization.registerClass(Embedding);
 
-},{"../backend/tfjs_backend":191,"../constraints":195,"../engine/topology":199,"../errors":201,"../initializers":209,"../regularizers":227,"../utils/generic_utils":229,"../utils/types_utils":233,"@tensorflow/tfjs-core":55}],215:[function(require,module,exports){
+},{"../backend/tfjs_backend":200,"../constraints":204,"../engine/topology":209,"../errors":213,"../initializers":221,"../regularizers":239,"../utils/generic_utils":241,"../utils/types_utils":245,"@tensorflow/tfjs-core":55}],227:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -31281,6 +32387,7 @@ var state_1 = require("../backend/state");
 var K = require("../backend/tfjs_backend");
 var topology_1 = require("../engine/topology");
 var errors_1 = require("../errors");
+var losses_1 = require("../losses");
 var generic_utils = require("../utils/generic_utils");
 var mathUtils = require("../utils/math_utils");
 var types_utils_1 = require("../utils/types_utils");
@@ -31457,6 +32564,9 @@ var Merge = (function (_super) {
             outputShape = [null].concat(outputShape);
         }
         return outputShape;
+    };
+    Merge.prototype.computeMask = function (inputs, mask) {
+        throw new errors_1.NotImplementedError('computeMask has not been implemented for Merge yet');
     };
     return Merge;
 }(topology_1.Layer));
@@ -31682,6 +32792,9 @@ var Concatenate = (function (_super) {
         }
         return outputShape;
     };
+    Concatenate.prototype.computeMask = function (inputs, mask) {
+        throw new errors_1.NotImplementedError('computeMask has not been implemented for Concatenate yet');
+    };
     Concatenate.prototype.getConfig = function () {
         var config = {
             'axis': this.axis,
@@ -31705,8 +32818,184 @@ function concatenate(config) {
     }
 }
 exports.concatenate = concatenate;
+function interpretAxis(axis, dim) {
+    while (axis < 0) {
+        axis += dim;
+    }
+    return axis;
+}
+function batchDot(x, y, axes) {
+    if (x.shape.length > 3 || y.shape.length > 3) {
+        throw new errors_1.NotImplementedError('batchDot is not implemented for tensors of 4D or higher rank yet');
+    }
+    tfc.util.assert(x.shape.length >= 2, "batchDot requires the rank of x to be >= 2, " +
+        ("but got " + x.shape.length));
+    tfc.util.assert(x.shape.length >= 2, "batchDot requires the rank of y to be >= 2, " +
+        ("but got " + y.shape.length));
+    if (typeof axes === 'number') {
+        axes = [axes, axes];
+    }
+    if (x.dtype === 'complex64' || y.dtype === 'complex64') {
+        throw new errors_1.NotImplementedError('batchDot is not implemented for complex64-type Tensors yet.');
+    }
+    var xNDim = x.shape.length;
+    var yNDim = y.shape.length;
+    if (axes == null) {
+        axes = [xNDim - 1, yNDim - 2];
+    }
+    var axesArray = axes;
+    return tfc.tidy(function () {
+        var diff;
+        if (xNDim > yNDim) {
+            diff = xNDim - yNDim;
+            var diffShape = [];
+            for (var i = 0; i < diff; ++i) {
+                diffShape.push(1);
+            }
+            y = y.reshape(y.shape.concat(diffShape));
+        }
+        else if (yNDim > xNDim) {
+            diff = yNDim - xNDim;
+            var diffShape = [];
+            for (var i = 0; i < diff; ++i) {
+                diffShape.push(1);
+            }
+            x = x.reshape(x.shape.concat(diffShape));
+        }
+        else {
+            diff = 0;
+        }
+        var out;
+        if (x.shape.length === 2 && y.shape.length === 2) {
+            if (axesArray[0] === axesArray[1]) {
+                out = x.mulStrict(y).sum(axesArray[0]);
+            }
+            else {
+                out = x.transpose([1, 0]).mulStrict(y).sum(axesArray[1]);
+            }
+        }
+        else {
+            var adjX = axesArray[0] === x.shape.length - 1 ? null : true;
+            var adjY = axesArray[1] === y.shape.length - 1 ? true : null;
+            out = x.matMul(y, adjX, adjY);
+        }
+        if (diff > 0) {
+            var idx = void 0;
+            if (xNDim > yNDim) {
+                idx = xNDim + yNDim - 3;
+            }
+            else {
+                idx = xNDim - 1;
+            }
+            var squeezeAxes = [];
+            for (var i = idx; i < idx + diff; ++i) {
+                squeezeAxes.push(i);
+            }
+            out = out.squeeze(squeezeAxes);
+        }
+        if (out.shape.length === 1) {
+            out = out.expandDims(1);
+        }
+        return out;
+    });
+}
+var Dot = (function (_super) {
+    __extends(Dot, _super);
+    function Dot(config) {
+        var _this = _super.call(this, config) || this;
+        _this.axes = config.axes;
+        _this.normalize = config.normalize == null ? false : config.normalize;
+        _this.supportsMasking = true;
+        _this.reshapeRequired = false;
+        return _this;
+    }
+    Dot.prototype.build = function (inputShape) {
+        tfc.util.assert(Array.isArray(inputShape) && inputShape.length === 2 &&
+            Array.isArray(inputShape[0]) && Array.isArray(inputShape[1]), 'A `Dot` layer should be called on a list of exactly 2 inputs.');
+        var shape1 = inputShape[0];
+        var shape2 = inputShape[1];
+        if (shape1.length > 3 || shape2.length > 3) {
+            throw new errors_1.NotImplementedError('Dot layer does not support tensors of 4D or higher rank yet.');
+        }
+        var axes = this.interpretAxes(shape1, shape2);
+        if (shape1[axes[0]] !== shape2[axes[1]]) {
+            throw new errors_1.ValueError("Dimension incompatibility: " +
+                (shape1[axes[0]] + " !== " + shape2[axes[1]]));
+        }
+    };
+    Dot.prototype.mergeFunction = function (inputs) {
+        if (inputs.length !== 2) {
+            throw new errors_1.ValueError('A `Dot` layer must be called on exactly 2 inputs, ' +
+                ("but received " + inputs.length + " input(s)."));
+        }
+        var x1 = inputs[0];
+        var x2 = inputs[1];
+        var axes;
+        if (!Array.isArray(this.axes)) {
+            axes = [
+                interpretAxis(this.axes, x1.shape.length),
+                interpretAxis(this.axes, x2.shape.length)
+            ];
+        }
+        else {
+            axes = this.axes.map(function (axis, i) { return interpretAxis(axis, inputs[i].shape.length); });
+        }
+        if (this.normalize) {
+            x1 = losses_1.l2Normalize(x1, axes[0]);
+            x2 = losses_1.l2Normalize(x2, axes[1]);
+        }
+        return batchDot(x1, x2, axes);
+    };
+    Dot.prototype.interpretAxes = function (shape1, shape2) {
+        var axes;
+        if (!Array.isArray(this.axes)) {
+            axes = [
+                interpretAxis(this.axes, shape1.length),
+                interpretAxis(this.axes, shape2.length)
+            ];
+        }
+        else {
+            axes = this.axes;
+        }
+        return axes;
+    };
+    Dot.prototype.computeOutputShape = function (inputShape) {
+        tfc.util.assert(Array.isArray(inputShape) && inputShape.length === 2 &&
+            Array.isArray(inputShape[0]) && Array.isArray(inputShape[1]), 'A `Dot` layer should be called on a list of exactly 2 inputs.');
+        var shape1 = inputShape[0];
+        var shape2 = inputShape[1];
+        if (shape1.length > 3 || shape2.length > 3) {
+            throw new errors_1.NotImplementedError('Dot layer does not support tensors of 4D or higher rank yet.');
+        }
+        var axes = this.interpretAxes(shape1, shape2);
+        shape1.splice(axes[0], 1);
+        shape2.splice(axes[1], 1);
+        shape2.splice(0, 1);
+        var outputShape = shape1.concat(shape2);
+        if (outputShape.length === 1) {
+            outputShape.push(1);
+        }
+        return outputShape;
+    };
+    Dot.prototype.computeMask = function (inputs, mask) {
+        throw new errors_1.NotImplementedError('computeMask has not been implemented for Dot yet');
+    };
+    Dot.prototype.getConfig = function () {
+        var config = {
+            'axes': this.axes,
+            'normalize': this.normalize
+        };
+        var baseConfig = _super.prototype.getConfig.call(this);
+        Object.assign(config, baseConfig);
+        return config;
+    };
+    Dot.className = 'Dot';
+    return Dot;
+}(Merge));
+exports.Dot = Dot;
+tfjs_core_1.serialization.registerClass(Dot);
 
-},{"../backend/state":190,"../backend/tfjs_backend":191,"../engine/topology":199,"../errors":201,"../utils/generic_utils":229,"../utils/math_utils":231,"../utils/types_utils":233,"@tensorflow/tfjs-core":55}],216:[function(require,module,exports){
+},{"../backend/state":199,"../backend/tfjs_backend":200,"../engine/topology":209,"../errors":213,"../losses":235,"../utils/generic_utils":241,"../utils/math_utils":243,"../utils/types_utils":245,"@tensorflow/tfjs-core":55}],228:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -31913,7 +33202,7 @@ var BatchNormalization = (function (_super) {
 exports.BatchNormalization = BatchNormalization;
 tfjs_core_1.serialization.registerClass(BatchNormalization);
 
-},{"../backend/state":190,"../constraints":195,"../engine/topology":199,"../errors":201,"../initializers":209,"../regularizers":227,"../utils/generic_utils":229,"../utils/math_utils":231,"../utils/types_utils":233,"@tensorflow/tfjs-core":55}],217:[function(require,module,exports){
+},{"../backend/state":199,"../constraints":204,"../engine/topology":209,"../errors":213,"../initializers":221,"../regularizers":239,"../utils/generic_utils":241,"../utils/math_utils":243,"../utils/types_utils":245,"@tensorflow/tfjs-core":55}],229:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -32085,7 +33374,7 @@ var ZeroPadding2D = (function (_super) {
 exports.ZeroPadding2D = ZeroPadding2D;
 tfjs_core_1.serialization.registerClass(ZeroPadding2D);
 
-},{"../backend/common":189,"../engine/topology":199,"../errors":201,"../utils/types_utils":233,"@tensorflow/tfjs-core":55}],218:[function(require,module,exports){
+},{"../backend/common":198,"../engine/topology":209,"../errors":213,"../utils/types_utils":245,"@tensorflow/tfjs-core":55}],230:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -32466,7 +33755,7 @@ var GlobalMaxPooling2D = (function (_super) {
 exports.GlobalMaxPooling2D = GlobalMaxPooling2D;
 tfjs_core_1.serialization.registerClass(GlobalMaxPooling2D);
 
-},{"../backend/common":189,"../backend/tfjs_backend":191,"../common":194,"../engine/topology":199,"../errors":201,"../utils/conv_utils":228,"../utils/types_utils":233,"./convolutional":211,"@tensorflow/tfjs-core":55}],219:[function(require,module,exports){
+},{"../backend/common":198,"../backend/tfjs_backend":200,"../common":203,"../engine/topology":209,"../errors":213,"../utils/conv_utils":240,"../utils/types_utils":245,"./convolutional":223,"@tensorflow/tfjs-core":55}],231:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -34105,7 +35394,7 @@ function generateDropoutMask(ones, rate, training, count) {
     }
 }
 
-},{"../activations":188,"../backend/state":190,"../backend/tfjs_backend":191,"../constraints":195,"../engine/topology":199,"../errors":201,"../initializers":209,"../regularizers":227,"../utils/math_utils":231,"../utils/types_utils":233,"../variables":235,"./serialization":220,"@tensorflow/tfjs-core":55}],220:[function(require,module,exports){
+},{"../activations":197,"../backend/state":199,"../backend/tfjs_backend":200,"../constraints":204,"../engine/topology":209,"../errors":213,"../initializers":221,"../regularizers":239,"../utils/math_utils":243,"../utils/types_utils":245,"../variables":247,"./serialization":232,"@tensorflow/tfjs-core":55}],232:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfjs_core_1 = require("@tensorflow/tfjs-core");
@@ -34116,7 +35405,7 @@ function deserialize(config, customObjects) {
 }
 exports.deserialize = deserialize;
 
-},{"../utils/generic_utils":229,"@tensorflow/tfjs-core":55}],221:[function(require,module,exports){
+},{"../utils/generic_utils":241,"@tensorflow/tfjs-core":55}],233:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -34533,7 +35822,7 @@ var Bidirectional = (function (_super) {
 exports.Bidirectional = Bidirectional;
 tfjs_core_1.serialization.registerClass(Bidirectional);
 
-},{"../backend/state":190,"../backend/tfjs_backend":191,"../common":194,"../engine/topology":199,"../errors":201,"../utils/generic_utils":229,"../utils/types_utils":233,"./recurrent":219,"./serialization":220,"@tensorflow/tfjs-core":55}],222:[function(require,module,exports){
+},{"../backend/state":199,"../backend/tfjs_backend":200,"../common":203,"../engine/topology":209,"../errors":213,"../utils/generic_utils":241,"../utils/types_utils":245,"./recurrent":231,"./serialization":232,"@tensorflow/tfjs-core":55}],234:[function(require,module,exports){
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -34619,7 +35908,7 @@ function disposeTensorsInLogs(logs) {
 }
 exports.disposeTensorsInLogs = disposeTensorsInLogs;
 
-},{"@tensorflow/tfjs-core":55}],223:[function(require,module,exports){
+},{"@tensorflow/tfjs-core":55}],235:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
@@ -34817,7 +36106,7 @@ function get(identifierOrFn) {
 }
 exports.get = get;
 
-},{"./backend/common":189,"./backend/state":190,"./backend/tfjs_backend":191,"./errors":201,"@tensorflow/tfjs-core":55}],224:[function(require,module,exports){
+},{"./backend/common":198,"./backend/state":199,"./backend/tfjs_backend":200,"./errors":213,"@tensorflow/tfjs-core":55}],236:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
@@ -34939,7 +36228,7 @@ function get(identifier) {
 }
 exports.get = get;
 
-},{"./backend/state":190,"./backend/tfjs_backend":191,"./errors":201,"./losses":223,"@tensorflow/tfjs-core":55}],225:[function(require,module,exports){
+},{"./backend/state":199,"./backend/tfjs_backend":200,"./errors":213,"./losses":235,"@tensorflow/tfjs-core":55}],237:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -35280,6 +36569,16 @@ var Sequential = (function (_super) {
         }
         return this.model.evaluate(x, y, config);
     };
+    Sequential.prototype.evaluateDataset = function (dataset, config) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                if (!this.built) {
+                    throw new errors_1.RuntimeError('The model needs to be compiled before being used.');
+                }
+                return [2, this.model.evaluateDataset(dataset, config)];
+            });
+        });
+    };
     Sequential.prototype.predict = function (x, config) {
         if (config === void 0) { config = {}; }
         if (this.model == null) {
@@ -35314,19 +36613,40 @@ var Sequential = (function (_super) {
             });
         });
     };
+    Sequential.prototype.fitDataset = function (dataset, config) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                if (!this.built) {
+                    throw new errors_1.RuntimeError('The model needs to be compiled before ' +
+                        'being used.');
+                }
+                return [2, this.model.fitDataset(dataset, config)];
+            });
+        });
+    };
     Sequential.fromConfig = function (cls, config) {
-        var model = new cls({});
+        var configArray;
+        var extraModelConfig = {};
+        if (config instanceof Array) {
+            if (!(config[0].className != null) ||
+                config[0]['className'] === 'Merge') {
+                throw new errors_1.ValueError('Legacy serialization format not supported yet.');
+            }
+            configArray = config;
+        }
+        else {
+            tfjs_core_1.util.assert(config['layers'] != null, "When the config data for a Sequential model is not an Array, " +
+                "it must be an Object that contains the 'layers' field.");
+            configArray = config['layers'];
+            delete config['layers'];
+            extraModelConfig = config;
+        }
+        var model = new cls(extraModelConfig);
         if (!(model instanceof Sequential)) {
-            throw new errors_1.ValueError("Sequential.fromConfig called on non-Sequential input: " + model);
+            throw new errors_1.NotImplementedError("Sequential.fromConfig called on non-Sequential input: " + model);
         }
-        if (!(config instanceof Array)) {
-            throw new errors_1.ValueError("Sequential.fromConfig called without an array of configs");
-        }
-        if (!(config[0].className != null) || config[0]['className'] === 'Merge') {
-            throw new errors_1.ValueError('Legacy serialization format not supported yet.');
-        }
-        for (var _i = 0, _a = config; _i < _a.length; _i++) {
-            var conf = _a[_i];
+        for (var _i = 0, configArray_1 = configArray; _i < configArray_1.length; _i++) {
+            var conf = configArray_1[_i];
             var layer = serialization_1.deserialize(conf);
             model.add(layer);
         }
@@ -35356,7 +36676,7 @@ var Sequential = (function (_super) {
 exports.Sequential = Sequential;
 tfjs_core_1.serialization.registerClass(Sequential);
 
-},{"./backend/state":190,"./engine/input_layer":198,"./engine/topology":199,"./engine/training":200,"./errors":201,"./layers/serialization":220,"./utils/generic_utils":229,"./utils/serialization_utils":232,"./utils/types_utils":233,"@tensorflow/tfjs-core":55}],226:[function(require,module,exports){
+},{"./backend/state":199,"./engine/input_layer":208,"./engine/topology":209,"./engine/training":210,"./errors":213,"./layers/serialization":232,"./utils/generic_utils":241,"./utils/serialization_utils":244,"./utils/types_utils":245,"@tensorflow/tfjs-core":55}],238:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfjs_core_1 = require("@tensorflow/tfjs-core");
@@ -35384,7 +36704,7 @@ function getOptimizer(identifier) {
 }
 exports.getOptimizer = getOptimizer;
 
-},{"./backend/common":189,"./errors":201,"@tensorflow/tfjs-core":55}],227:[function(require,module,exports){
+},{"./backend/common":198,"./errors":213,"@tensorflow/tfjs-core":55}],239:[function(require,module,exports){
 "use strict";
 var __extends = (this && this.__extends) || (function () {
     var extendStatics = Object.setPrototypeOf ||
@@ -35487,7 +36807,7 @@ function getRegularizer(identifier) {
 }
 exports.getRegularizer = getRegularizer;
 
-},{"./backend/state":190,"./backend/tfjs_backend":191,"./utils/generic_utils":229,"@tensorflow/tfjs-core":55}],228:[function(require,module,exports){
+},{"./backend/state":199,"./backend/tfjs_backend":200,"./utils/generic_utils":241,"@tensorflow/tfjs-core":55}],240:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var errors_1 = require("../errors");
@@ -35547,7 +36867,7 @@ function deconvLength(dimSize, strideSize, kernelSize, padding) {
 }
 exports.deconvLength = deconvLength;
 
-},{"../errors":201,"./generic_utils":229,"./math_utils":231}],229:[function(require,module,exports){
+},{"../errors":213,"./generic_utils":241,"./math_utils":243}],241:[function(require,module,exports){
 "use strict";
 var __assign = (this && this.__assign) || Object.assign || function(t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
@@ -35816,7 +37136,7 @@ function checkArrayTypeAndLength(x, expectedType, minLength, maxLength) {
 }
 exports.checkArrayTypeAndLength = checkArrayTypeAndLength;
 
-},{"../errors":201}],230:[function(require,module,exports){
+},{"../errors":213}],242:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var variable_utils_1 = require("./variable_utils");
@@ -35976,7 +37296,7 @@ function printLayerSummaryWithConnections(layer, positions, relevantNodes, print
     }
 }
 
-},{"./variable_utils":234}],231:[function(require,module,exports){
+},{"./variable_utils":246}],243:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
@@ -36048,7 +37368,7 @@ function range(begin, end) {
 }
 exports.range = range;
 
-},{"../errors":201,"@tensorflow/tfjs-core":55}],232:[function(require,module,exports){
+},{"../errors":213,"@tensorflow/tfjs-core":55}],244:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var generic_utils = require("../utils/generic_utils");
@@ -36142,7 +37462,7 @@ function convertTsToPythonic(tsConfig, key) {
 }
 exports.convertTsToPythonic = convertTsToPythonic;
 
-},{"../utils/generic_utils":229}],233:[function(require,module,exports){
+},{"../utils/generic_utils":241}],245:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var errors_1 = require("../errors");
@@ -36190,7 +37510,7 @@ function getExactlyOneShape(shapes) {
 }
 exports.getExactlyOneShape = getExactlyOneShape;
 
-},{"../errors":201}],234:[function(require,module,exports){
+},{"../errors":213}],246:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 function countParamsInWeights(weights) {
@@ -36208,7 +37528,7 @@ function countParamsInWeights(weights) {
 }
 exports.countParamsInWeights = countParamsInWeights;
 
-},{}],235:[function(require,module,exports){
+},{}],247:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var tfc = require("@tensorflow/tfjs-core");
@@ -36349,13 +37669,13 @@ function gradients(lossFn, variables) {
 }
 exports.gradients = gradients;
 
-},{"./backend/state":190,"./common":194,"./errors":201,"@tensorflow/tfjs-core":55}],236:[function(require,module,exports){
+},{"./backend/state":199,"./common":203,"./errors":213,"@tensorflow/tfjs-core":55}],248:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var version = '0.8.1';
+var version = '0.8.2';
 exports.version = version;
 
-},{}],237:[function(require,module,exports){
+},{}],249:[function(require,module,exports){
 "use strict";
 function __export(m) {
     for (var p in m) if (!exports.hasOwnProperty(p)) exports[p] = m[p];
@@ -36375,13 +37695,13 @@ exports.version = {
     'tfjs': version_1.version
 };
 
-},{"./version":238,"@tensorflow/tfjs-converter":13,"@tensorflow/tfjs-core":55,"@tensorflow/tfjs-layers":208}],238:[function(require,module,exports){
+},{"./version":250,"@tensorflow/tfjs-converter":13,"@tensorflow/tfjs-core":55,"@tensorflow/tfjs-layers":220}],250:[function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-var version = '0.13.1';
+var version = '0.13.2';
 exports.version = version;
 
-},{}],239:[function(require,module,exports){
+},{}],251:[function(require,module,exports){
 (function (global){
 "use strict";
 
@@ -36412,7 +37732,7 @@ define(String.prototype, "padRight", "".padEnd);
   [][key] && define(Array, key, Function.call.bind([][key]));
 });
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"core-js/fn/regexp/escape":244,"core-js/shim":567,"regenerator-runtime/runtime":240}],240:[function(require,module,exports){
+},{"core-js/fn/regexp/escape":256,"core-js/shim":579,"regenerator-runtime/runtime":252}],252:[function(require,module,exports){
 (function (global){
 /**
  * Copyright (c) 2014, Facebook, Inc.
@@ -37152,7 +38472,7 @@ define(String.prototype, "padRight", "".padEnd);
 );
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],241:[function(require,module,exports){
+},{}],253:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -37305,9 +38625,9 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],242:[function(require,module,exports){
+},{}],254:[function(require,module,exports){
 
-},{}],243:[function(require,module,exports){
+},{}],255:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -39086,24 +40406,24 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":241,"ieee754":568}],244:[function(require,module,exports){
+},{"base64-js":253,"ieee754":580}],256:[function(require,module,exports){
 require('../../modules/core.regexp.escape');
 module.exports = require('../../modules/_core').RegExp.escape;
 
-},{"../../modules/_core":265,"../../modules/core.regexp.escape":370}],245:[function(require,module,exports){
+},{"../../modules/_core":277,"../../modules/core.regexp.escape":382}],257:[function(require,module,exports){
 module.exports = function (it) {
   if (typeof it != 'function') throw TypeError(it + ' is not a function!');
   return it;
 };
 
-},{}],246:[function(require,module,exports){
+},{}],258:[function(require,module,exports){
 var cof = require('./_cof');
 module.exports = function (it, msg) {
   if (typeof it != 'number' && cof(it) != 'Number') throw TypeError(msg);
   return +it;
 };
 
-},{"./_cof":260}],247:[function(require,module,exports){
+},{"./_cof":272}],259:[function(require,module,exports){
 // 22.1.3.31 Array.prototype[@@unscopables]
 var UNSCOPABLES = require('./_wks')('unscopables');
 var ArrayProto = Array.prototype;
@@ -39112,21 +40432,21 @@ module.exports = function (key) {
   ArrayProto[UNSCOPABLES][key] = true;
 };
 
-},{"./_hide":284,"./_wks":368}],248:[function(require,module,exports){
+},{"./_hide":296,"./_wks":380}],260:[function(require,module,exports){
 module.exports = function (it, Constructor, name, forbiddenField) {
   if (!(it instanceof Constructor) || (forbiddenField !== undefined && forbiddenField in it)) {
     throw TypeError(name + ': incorrect invocation!');
   } return it;
 };
 
-},{}],249:[function(require,module,exports){
+},{}],261:[function(require,module,exports){
 var isObject = require('./_is-object');
 module.exports = function (it) {
   if (!isObject(it)) throw TypeError(it + ' is not an object!');
   return it;
 };
 
-},{"./_is-object":293}],250:[function(require,module,exports){
+},{"./_is-object":305}],262:[function(require,module,exports){
 // 22.1.3.3 Array.prototype.copyWithin(target, start, end = this.length)
 'use strict';
 var toObject = require('./_to-object');
@@ -39154,7 +40474,7 @@ module.exports = [].copyWithin || function copyWithin(target /* = 0 */, start /*
   } return O;
 };
 
-},{"./_to-absolute-index":353,"./_to-length":357,"./_to-object":358}],251:[function(require,module,exports){
+},{"./_to-absolute-index":365,"./_to-length":369,"./_to-object":370}],263:[function(require,module,exports){
 // 22.1.3.6 Array.prototype.fill(value, start = 0, end = this.length)
 'use strict';
 var toObject = require('./_to-object');
@@ -39171,7 +40491,7 @@ module.exports = function fill(value /* , start = 0, end = @length */) {
   return O;
 };
 
-},{"./_to-absolute-index":353,"./_to-length":357,"./_to-object":358}],252:[function(require,module,exports){
+},{"./_to-absolute-index":365,"./_to-length":369,"./_to-object":370}],264:[function(require,module,exports){
 var forOf = require('./_for-of');
 
 module.exports = function (iter, ITERATOR) {
@@ -39180,7 +40500,7 @@ module.exports = function (iter, ITERATOR) {
   return result;
 };
 
-},{"./_for-of":281}],253:[function(require,module,exports){
+},{"./_for-of":293}],265:[function(require,module,exports){
 // false -> Array#indexOf
 // true  -> Array#includes
 var toIObject = require('./_to-iobject');
@@ -39205,7 +40525,7 @@ module.exports = function (IS_INCLUDES) {
   };
 };
 
-},{"./_to-absolute-index":353,"./_to-iobject":356,"./_to-length":357}],254:[function(require,module,exports){
+},{"./_to-absolute-index":365,"./_to-iobject":368,"./_to-length":369}],266:[function(require,module,exports){
 // 0 -> Array#forEach
 // 1 -> Array#map
 // 2 -> Array#filter
@@ -39251,7 +40571,7 @@ module.exports = function (TYPE, $create) {
   };
 };
 
-},{"./_array-species-create":257,"./_ctx":267,"./_iobject":289,"./_to-length":357,"./_to-object":358}],255:[function(require,module,exports){
+},{"./_array-species-create":269,"./_ctx":279,"./_iobject":301,"./_to-length":369,"./_to-object":370}],267:[function(require,module,exports){
 var aFunction = require('./_a-function');
 var toObject = require('./_to-object');
 var IObject = require('./_iobject');
@@ -39281,7 +40601,7 @@ module.exports = function (that, callbackfn, aLen, memo, isRight) {
   return memo;
 };
 
-},{"./_a-function":245,"./_iobject":289,"./_to-length":357,"./_to-object":358}],256:[function(require,module,exports){
+},{"./_a-function":257,"./_iobject":301,"./_to-length":369,"./_to-object":370}],268:[function(require,module,exports){
 var isObject = require('./_is-object');
 var isArray = require('./_is-array');
 var SPECIES = require('./_wks')('species');
@@ -39299,7 +40619,7 @@ module.exports = function (original) {
   } return C === undefined ? Array : C;
 };
 
-},{"./_is-array":291,"./_is-object":293,"./_wks":368}],257:[function(require,module,exports){
+},{"./_is-array":303,"./_is-object":305,"./_wks":380}],269:[function(require,module,exports){
 // 9.4.2.3 ArraySpeciesCreate(originalArray, length)
 var speciesConstructor = require('./_array-species-constructor');
 
@@ -39307,7 +40627,7 @@ module.exports = function (original, length) {
   return new (speciesConstructor(original))(length);
 };
 
-},{"./_array-species-constructor":256}],258:[function(require,module,exports){
+},{"./_array-species-constructor":268}],270:[function(require,module,exports){
 'use strict';
 var aFunction = require('./_a-function');
 var isObject = require('./_is-object');
@@ -39334,7 +40654,7 @@ module.exports = Function.bind || function bind(that /* , ...args */) {
   return bound;
 };
 
-},{"./_a-function":245,"./_invoke":288,"./_is-object":293}],259:[function(require,module,exports){
+},{"./_a-function":257,"./_invoke":300,"./_is-object":305}],271:[function(require,module,exports){
 // getting tag from 19.1.3.6 Object.prototype.toString()
 var cof = require('./_cof');
 var TAG = require('./_wks')('toStringTag');
@@ -39359,14 +40679,14 @@ module.exports = function (it) {
     : (B = cof(O)) == 'Object' && typeof O.callee == 'function' ? 'Arguments' : B;
 };
 
-},{"./_cof":260,"./_wks":368}],260:[function(require,module,exports){
+},{"./_cof":272,"./_wks":380}],272:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = function (it) {
   return toString.call(it).slice(8, -1);
 };
 
-},{}],261:[function(require,module,exports){
+},{}],273:[function(require,module,exports){
 'use strict';
 var dP = require('./_object-dp').f;
 var create = require('./_object-create');
@@ -39512,7 +40832,7 @@ module.exports = {
   }
 };
 
-},{"./_an-instance":248,"./_ctx":267,"./_descriptors":271,"./_for-of":281,"./_iter-define":297,"./_iter-step":299,"./_meta":307,"./_object-create":312,"./_object-dp":313,"./_redefine-all":332,"./_set-species":339,"./_validate-collection":365}],262:[function(require,module,exports){
+},{"./_an-instance":260,"./_ctx":279,"./_descriptors":283,"./_for-of":293,"./_iter-define":309,"./_iter-step":311,"./_meta":319,"./_object-create":324,"./_object-dp":325,"./_redefine-all":344,"./_set-species":351,"./_validate-collection":377}],274:[function(require,module,exports){
 // https://github.com/DavidBruant/Map-Set.prototype.toJSON
 var classof = require('./_classof');
 var from = require('./_array-from-iterable');
@@ -39523,7 +40843,7 @@ module.exports = function (NAME) {
   };
 };
 
-},{"./_array-from-iterable":252,"./_classof":259}],263:[function(require,module,exports){
+},{"./_array-from-iterable":264,"./_classof":271}],275:[function(require,module,exports){
 'use strict';
 var redefineAll = require('./_redefine-all');
 var getWeak = require('./_meta').getWeak;
@@ -39610,7 +40930,7 @@ module.exports = {
   ufstore: uncaughtFrozenStore
 };
 
-},{"./_an-instance":248,"./_an-object":249,"./_array-methods":254,"./_for-of":281,"./_has":283,"./_is-object":293,"./_meta":307,"./_redefine-all":332,"./_validate-collection":365}],264:[function(require,module,exports){
+},{"./_an-instance":260,"./_an-object":261,"./_array-methods":266,"./_for-of":293,"./_has":295,"./_is-object":305,"./_meta":319,"./_redefine-all":344,"./_validate-collection":377}],276:[function(require,module,exports){
 'use strict';
 var global = require('./_global');
 var $export = require('./_export');
@@ -39697,11 +41017,11 @@ module.exports = function (NAME, wrapper, methods, common, IS_MAP, IS_WEAK) {
   return C;
 };
 
-},{"./_an-instance":248,"./_export":275,"./_fails":277,"./_for-of":281,"./_global":282,"./_inherit-if-required":287,"./_is-object":293,"./_iter-detect":298,"./_meta":307,"./_redefine":333,"./_redefine-all":332,"./_set-to-string-tag":340}],265:[function(require,module,exports){
+},{"./_an-instance":260,"./_export":287,"./_fails":289,"./_for-of":293,"./_global":294,"./_inherit-if-required":299,"./_is-object":305,"./_iter-detect":310,"./_meta":319,"./_redefine":345,"./_redefine-all":344,"./_set-to-string-tag":352}],277:[function(require,module,exports){
 var core = module.exports = { version: '2.5.7' };
 if (typeof __e == 'number') __e = core; // eslint-disable-line no-undef
 
-},{}],266:[function(require,module,exports){
+},{}],278:[function(require,module,exports){
 'use strict';
 var $defineProperty = require('./_object-dp');
 var createDesc = require('./_property-desc');
@@ -39711,7 +41031,7 @@ module.exports = function (object, index, value) {
   else object[index] = value;
 };
 
-},{"./_object-dp":313,"./_property-desc":331}],267:[function(require,module,exports){
+},{"./_object-dp":325,"./_property-desc":343}],279:[function(require,module,exports){
 // optional / simple context binding
 var aFunction = require('./_a-function');
 module.exports = function (fn, that, length) {
@@ -39733,7 +41053,7 @@ module.exports = function (fn, that, length) {
   };
 };
 
-},{"./_a-function":245}],268:[function(require,module,exports){
+},{"./_a-function":257}],280:[function(require,module,exports){
 'use strict';
 // 20.3.4.36 / 15.9.5.43 Date.prototype.toISOString()
 var fails = require('./_fails');
@@ -39761,7 +41081,7 @@ module.exports = (fails(function () {
     ':' + lz(d.getUTCSeconds()) + '.' + (m > 99 ? m : '0' + lz(m)) + 'Z';
 } : $toISOString;
 
-},{"./_fails":277}],269:[function(require,module,exports){
+},{"./_fails":289}],281:[function(require,module,exports){
 'use strict';
 var anObject = require('./_an-object');
 var toPrimitive = require('./_to-primitive');
@@ -39772,20 +41092,20 @@ module.exports = function (hint) {
   return toPrimitive(anObject(this), hint != NUMBER);
 };
 
-},{"./_an-object":249,"./_to-primitive":359}],270:[function(require,module,exports){
+},{"./_an-object":261,"./_to-primitive":371}],282:[function(require,module,exports){
 // 7.2.1 RequireObjectCoercible(argument)
 module.exports = function (it) {
   if (it == undefined) throw TypeError("Can't call method on  " + it);
   return it;
 };
 
-},{}],271:[function(require,module,exports){
+},{}],283:[function(require,module,exports){
 // Thank's IE8 for his funny defineProperty
 module.exports = !require('./_fails')(function () {
   return Object.defineProperty({}, 'a', { get: function () { return 7; } }).a != 7;
 });
 
-},{"./_fails":277}],272:[function(require,module,exports){
+},{"./_fails":289}],284:[function(require,module,exports){
 var isObject = require('./_is-object');
 var document = require('./_global').document;
 // typeof document.createElement is 'object' in old IE
@@ -39794,13 +41114,13 @@ module.exports = function (it) {
   return is ? document.createElement(it) : {};
 };
 
-},{"./_global":282,"./_is-object":293}],273:[function(require,module,exports){
+},{"./_global":294,"./_is-object":305}],285:[function(require,module,exports){
 // IE 8- don't enum bug keys
 module.exports = (
   'constructor,hasOwnProperty,isPrototypeOf,propertyIsEnumerable,toLocaleString,toString,valueOf'
 ).split(',');
 
-},{}],274:[function(require,module,exports){
+},{}],286:[function(require,module,exports){
 // all enumerable object keys, includes symbols
 var getKeys = require('./_object-keys');
 var gOPS = require('./_object-gops');
@@ -39817,7 +41137,7 @@ module.exports = function (it) {
   } return result;
 };
 
-},{"./_object-gops":319,"./_object-keys":322,"./_object-pie":323}],275:[function(require,module,exports){
+},{"./_object-gops":331,"./_object-keys":334,"./_object-pie":335}],287:[function(require,module,exports){
 var global = require('./_global');
 var core = require('./_core');
 var hide = require('./_hide');
@@ -39862,7 +41182,7 @@ $export.U = 64;  // safe
 $export.R = 128; // real proto method for `library`
 module.exports = $export;
 
-},{"./_core":265,"./_ctx":267,"./_global":282,"./_hide":284,"./_redefine":333}],276:[function(require,module,exports){
+},{"./_core":277,"./_ctx":279,"./_global":294,"./_hide":296,"./_redefine":345}],288:[function(require,module,exports){
 var MATCH = require('./_wks')('match');
 module.exports = function (KEY) {
   var re = /./;
@@ -39876,7 +41196,7 @@ module.exports = function (KEY) {
   } return true;
 };
 
-},{"./_wks":368}],277:[function(require,module,exports){
+},{"./_wks":380}],289:[function(require,module,exports){
 module.exports = function (exec) {
   try {
     return !!exec();
@@ -39885,7 +41205,7 @@ module.exports = function (exec) {
   }
 };
 
-},{}],278:[function(require,module,exports){
+},{}],290:[function(require,module,exports){
 'use strict';
 var hide = require('./_hide');
 var redefine = require('./_redefine');
@@ -39915,7 +41235,7 @@ module.exports = function (KEY, length, exec) {
   }
 };
 
-},{"./_defined":270,"./_fails":277,"./_hide":284,"./_redefine":333,"./_wks":368}],279:[function(require,module,exports){
+},{"./_defined":282,"./_fails":289,"./_hide":296,"./_redefine":345,"./_wks":380}],291:[function(require,module,exports){
 'use strict';
 // 21.2.5.3 get RegExp.prototype.flags
 var anObject = require('./_an-object');
@@ -39930,7 +41250,7 @@ module.exports = function () {
   return result;
 };
 
-},{"./_an-object":249}],280:[function(require,module,exports){
+},{"./_an-object":261}],292:[function(require,module,exports){
 'use strict';
 // https://tc39.github.io/proposal-flatMap/#sec-FlattenIntoArray
 var isArray = require('./_is-array');
@@ -39971,7 +41291,7 @@ function flattenIntoArray(target, original, source, sourceLen, start, depth, map
 
 module.exports = flattenIntoArray;
 
-},{"./_ctx":267,"./_is-array":291,"./_is-object":293,"./_to-length":357,"./_wks":368}],281:[function(require,module,exports){
+},{"./_ctx":279,"./_is-array":303,"./_is-object":305,"./_to-length":369,"./_wks":380}],293:[function(require,module,exports){
 var ctx = require('./_ctx');
 var call = require('./_iter-call');
 var isArrayIter = require('./_is-array-iter');
@@ -39998,7 +41318,7 @@ var exports = module.exports = function (iterable, entries, fn, that, ITERATOR) 
 exports.BREAK = BREAK;
 exports.RETURN = RETURN;
 
-},{"./_an-object":249,"./_ctx":267,"./_is-array-iter":290,"./_iter-call":295,"./_to-length":357,"./core.get-iterator-method":369}],282:[function(require,module,exports){
+},{"./_an-object":261,"./_ctx":279,"./_is-array-iter":302,"./_iter-call":307,"./_to-length":369,"./core.get-iterator-method":381}],294:[function(require,module,exports){
 // https://github.com/zloirock/core-js/issues/86#issuecomment-115759028
 var global = module.exports = typeof window != 'undefined' && window.Math == Math
   ? window : typeof self != 'undefined' && self.Math == Math ? self
@@ -40006,13 +41326,13 @@ var global = module.exports = typeof window != 'undefined' && window.Math == Mat
   : Function('return this')();
 if (typeof __g == 'number') __g = global; // eslint-disable-line no-undef
 
-},{}],283:[function(require,module,exports){
+},{}],295:[function(require,module,exports){
 var hasOwnProperty = {}.hasOwnProperty;
 module.exports = function (it, key) {
   return hasOwnProperty.call(it, key);
 };
 
-},{}],284:[function(require,module,exports){
+},{}],296:[function(require,module,exports){
 var dP = require('./_object-dp');
 var createDesc = require('./_property-desc');
 module.exports = require('./_descriptors') ? function (object, key, value) {
@@ -40022,16 +41342,16 @@ module.exports = require('./_descriptors') ? function (object, key, value) {
   return object;
 };
 
-},{"./_descriptors":271,"./_object-dp":313,"./_property-desc":331}],285:[function(require,module,exports){
+},{"./_descriptors":283,"./_object-dp":325,"./_property-desc":343}],297:[function(require,module,exports){
 var document = require('./_global').document;
 module.exports = document && document.documentElement;
 
-},{"./_global":282}],286:[function(require,module,exports){
+},{"./_global":294}],298:[function(require,module,exports){
 module.exports = !require('./_descriptors') && !require('./_fails')(function () {
   return Object.defineProperty(require('./_dom-create')('div'), 'a', { get: function () { return 7; } }).a != 7;
 });
 
-},{"./_descriptors":271,"./_dom-create":272,"./_fails":277}],287:[function(require,module,exports){
+},{"./_descriptors":283,"./_dom-create":284,"./_fails":289}],299:[function(require,module,exports){
 var isObject = require('./_is-object');
 var setPrototypeOf = require('./_set-proto').set;
 module.exports = function (that, target, C) {
@@ -40042,7 +41362,7 @@ module.exports = function (that, target, C) {
   } return that;
 };
 
-},{"./_is-object":293,"./_set-proto":338}],288:[function(require,module,exports){
+},{"./_is-object":305,"./_set-proto":350}],300:[function(require,module,exports){
 // fast apply, http://jsperf.lnkit.com/fast-apply/5
 module.exports = function (fn, args, that) {
   var un = that === undefined;
@@ -40060,7 +41380,7 @@ module.exports = function (fn, args, that) {
   } return fn.apply(that, args);
 };
 
-},{}],289:[function(require,module,exports){
+},{}],301:[function(require,module,exports){
 // fallback for non-array-like ES3 and non-enumerable old V8 strings
 var cof = require('./_cof');
 // eslint-disable-next-line no-prototype-builtins
@@ -40068,7 +41388,7 @@ module.exports = Object('z').propertyIsEnumerable(0) ? Object : function (it) {
   return cof(it) == 'String' ? it.split('') : Object(it);
 };
 
-},{"./_cof":260}],290:[function(require,module,exports){
+},{"./_cof":272}],302:[function(require,module,exports){
 // check on default Array iterator
 var Iterators = require('./_iterators');
 var ITERATOR = require('./_wks')('iterator');
@@ -40078,14 +41398,14 @@ module.exports = function (it) {
   return it !== undefined && (Iterators.Array === it || ArrayProto[ITERATOR] === it);
 };
 
-},{"./_iterators":300,"./_wks":368}],291:[function(require,module,exports){
+},{"./_iterators":312,"./_wks":380}],303:[function(require,module,exports){
 // 7.2.2 IsArray(argument)
 var cof = require('./_cof');
 module.exports = Array.isArray || function isArray(arg) {
   return cof(arg) == 'Array';
 };
 
-},{"./_cof":260}],292:[function(require,module,exports){
+},{"./_cof":272}],304:[function(require,module,exports){
 // 20.1.2.3 Number.isInteger(number)
 var isObject = require('./_is-object');
 var floor = Math.floor;
@@ -40093,12 +41413,12 @@ module.exports = function isInteger(it) {
   return !isObject(it) && isFinite(it) && floor(it) === it;
 };
 
-},{"./_is-object":293}],293:[function(require,module,exports){
+},{"./_is-object":305}],305:[function(require,module,exports){
 module.exports = function (it) {
   return typeof it === 'object' ? it !== null : typeof it === 'function';
 };
 
-},{}],294:[function(require,module,exports){
+},{}],306:[function(require,module,exports){
 // 7.2.8 IsRegExp(argument)
 var isObject = require('./_is-object');
 var cof = require('./_cof');
@@ -40108,7 +41428,7 @@ module.exports = function (it) {
   return isObject(it) && ((isRegExp = it[MATCH]) !== undefined ? !!isRegExp : cof(it) == 'RegExp');
 };
 
-},{"./_cof":260,"./_is-object":293,"./_wks":368}],295:[function(require,module,exports){
+},{"./_cof":272,"./_is-object":305,"./_wks":380}],307:[function(require,module,exports){
 // call something on iterator step with safe closing on error
 var anObject = require('./_an-object');
 module.exports = function (iterator, fn, value, entries) {
@@ -40122,7 +41442,7 @@ module.exports = function (iterator, fn, value, entries) {
   }
 };
 
-},{"./_an-object":249}],296:[function(require,module,exports){
+},{"./_an-object":261}],308:[function(require,module,exports){
 'use strict';
 var create = require('./_object-create');
 var descriptor = require('./_property-desc');
@@ -40137,7 +41457,7 @@ module.exports = function (Constructor, NAME, next) {
   setToStringTag(Constructor, NAME + ' Iterator');
 };
 
-},{"./_hide":284,"./_object-create":312,"./_property-desc":331,"./_set-to-string-tag":340,"./_wks":368}],297:[function(require,module,exports){
+},{"./_hide":296,"./_object-create":324,"./_property-desc":343,"./_set-to-string-tag":352,"./_wks":380}],309:[function(require,module,exports){
 'use strict';
 var LIBRARY = require('./_library');
 var $export = require('./_export');
@@ -40208,7 +41528,7 @@ module.exports = function (Base, NAME, Constructor, next, DEFAULT, IS_SET, FORCE
   return methods;
 };
 
-},{"./_export":275,"./_hide":284,"./_iter-create":296,"./_iterators":300,"./_library":301,"./_object-gpo":320,"./_redefine":333,"./_set-to-string-tag":340,"./_wks":368}],298:[function(require,module,exports){
+},{"./_export":287,"./_hide":296,"./_iter-create":308,"./_iterators":312,"./_library":313,"./_object-gpo":332,"./_redefine":345,"./_set-to-string-tag":352,"./_wks":380}],310:[function(require,module,exports){
 var ITERATOR = require('./_wks')('iterator');
 var SAFE_CLOSING = false;
 
@@ -40232,18 +41552,18 @@ module.exports = function (exec, skipClosing) {
   return safe;
 };
 
-},{"./_wks":368}],299:[function(require,module,exports){
+},{"./_wks":380}],311:[function(require,module,exports){
 module.exports = function (done, value) {
   return { value: value, done: !!done };
 };
 
-},{}],300:[function(require,module,exports){
+},{}],312:[function(require,module,exports){
 module.exports = {};
 
-},{}],301:[function(require,module,exports){
+},{}],313:[function(require,module,exports){
 module.exports = false;
 
-},{}],302:[function(require,module,exports){
+},{}],314:[function(require,module,exports){
 // 20.2.2.14 Math.expm1(x)
 var $expm1 = Math.expm1;
 module.exports = (!$expm1
@@ -40255,7 +41575,7 @@ module.exports = (!$expm1
   return (x = +x) == 0 ? x : x > -1e-6 && x < 1e-6 ? x + x * x / 2 : Math.exp(x) - 1;
 } : $expm1;
 
-},{}],303:[function(require,module,exports){
+},{}],315:[function(require,module,exports){
 // 20.2.2.16 Math.fround(x)
 var sign = require('./_math-sign');
 var pow = Math.pow;
@@ -40280,13 +41600,13 @@ module.exports = Math.fround || function fround(x) {
   return $sign * result;
 };
 
-},{"./_math-sign":306}],304:[function(require,module,exports){
+},{"./_math-sign":318}],316:[function(require,module,exports){
 // 20.2.2.20 Math.log1p(x)
 module.exports = Math.log1p || function log1p(x) {
   return (x = +x) > -1e-8 && x < 1e-8 ? x - x * x / 2 : Math.log(1 + x);
 };
 
-},{}],305:[function(require,module,exports){
+},{}],317:[function(require,module,exports){
 // https://rwaldron.github.io/proposal-math-extensions/
 module.exports = Math.scale || function scale(x, inLow, inHigh, outLow, outHigh) {
   if (
@@ -40306,14 +41626,14 @@ module.exports = Math.scale || function scale(x, inLow, inHigh, outLow, outHigh)
   return (x - inLow) * (outHigh - outLow) / (inHigh - inLow) + outLow;
 };
 
-},{}],306:[function(require,module,exports){
+},{}],318:[function(require,module,exports){
 // 20.2.2.28 Math.sign(x)
 module.exports = Math.sign || function sign(x) {
   // eslint-disable-next-line no-self-compare
   return (x = +x) == 0 || x != x ? x : x < 0 ? -1 : 1;
 };
 
-},{}],307:[function(require,module,exports){
+},{}],319:[function(require,module,exports){
 var META = require('./_uid')('meta');
 var isObject = require('./_is-object');
 var has = require('./_has');
@@ -40368,7 +41688,7 @@ var meta = module.exports = {
   onFreeze: onFreeze
 };
 
-},{"./_fails":277,"./_has":283,"./_is-object":293,"./_object-dp":313,"./_uid":363}],308:[function(require,module,exports){
+},{"./_fails":289,"./_has":295,"./_is-object":305,"./_object-dp":325,"./_uid":375}],320:[function(require,module,exports){
 var Map = require('./es6.map');
 var $export = require('./_export');
 var shared = require('./_shared')('metadata');
@@ -40421,7 +41741,7 @@ module.exports = {
   exp: exp
 };
 
-},{"./_export":275,"./_shared":342,"./es6.map":400,"./es6.weak-map":506}],309:[function(require,module,exports){
+},{"./_export":287,"./_shared":354,"./es6.map":412,"./es6.weak-map":518}],321:[function(require,module,exports){
 var global = require('./_global');
 var macrotask = require('./_task').set;
 var Observer = global.MutationObserver || global.WebKitMutationObserver;
@@ -40492,7 +41812,7 @@ module.exports = function () {
   };
 };
 
-},{"./_cof":260,"./_global":282,"./_task":352}],310:[function(require,module,exports){
+},{"./_cof":272,"./_global":294,"./_task":364}],322:[function(require,module,exports){
 'use strict';
 // 25.4.1.5 NewPromiseCapability(C)
 var aFunction = require('./_a-function');
@@ -40512,7 +41832,7 @@ module.exports.f = function (C) {
   return new PromiseCapability(C);
 };
 
-},{"./_a-function":245}],311:[function(require,module,exports){
+},{"./_a-function":257}],323:[function(require,module,exports){
 'use strict';
 // 19.1.2.1 Object.assign(target, source, ...)
 var getKeys = require('./_object-keys');
@@ -40548,7 +41868,7 @@ module.exports = !$assign || require('./_fails')(function () {
   } return T;
 } : $assign;
 
-},{"./_fails":277,"./_iobject":289,"./_object-gops":319,"./_object-keys":322,"./_object-pie":323,"./_to-object":358}],312:[function(require,module,exports){
+},{"./_fails":289,"./_iobject":301,"./_object-gops":331,"./_object-keys":334,"./_object-pie":335,"./_to-object":370}],324:[function(require,module,exports){
 // 19.1.2.2 / 15.2.3.5 Object.create(O [, Properties])
 var anObject = require('./_an-object');
 var dPs = require('./_object-dps');
@@ -40591,7 +41911,7 @@ module.exports = Object.create || function create(O, Properties) {
   return Properties === undefined ? result : dPs(result, Properties);
 };
 
-},{"./_an-object":249,"./_dom-create":272,"./_enum-bug-keys":273,"./_html":285,"./_object-dps":314,"./_shared-key":341}],313:[function(require,module,exports){
+},{"./_an-object":261,"./_dom-create":284,"./_enum-bug-keys":285,"./_html":297,"./_object-dps":326,"./_shared-key":353}],325:[function(require,module,exports){
 var anObject = require('./_an-object');
 var IE8_DOM_DEFINE = require('./_ie8-dom-define');
 var toPrimitive = require('./_to-primitive');
@@ -40609,7 +41929,7 @@ exports.f = require('./_descriptors') ? Object.defineProperty : function defineP
   return O;
 };
 
-},{"./_an-object":249,"./_descriptors":271,"./_ie8-dom-define":286,"./_to-primitive":359}],314:[function(require,module,exports){
+},{"./_an-object":261,"./_descriptors":283,"./_ie8-dom-define":298,"./_to-primitive":371}],326:[function(require,module,exports){
 var dP = require('./_object-dp');
 var anObject = require('./_an-object');
 var getKeys = require('./_object-keys');
@@ -40624,7 +41944,7 @@ module.exports = require('./_descriptors') ? Object.defineProperties : function 
   return O;
 };
 
-},{"./_an-object":249,"./_descriptors":271,"./_object-dp":313,"./_object-keys":322}],315:[function(require,module,exports){
+},{"./_an-object":261,"./_descriptors":283,"./_object-dp":325,"./_object-keys":334}],327:[function(require,module,exports){
 'use strict';
 // Forced replacement prototype accessors methods
 module.exports = require('./_library') || !require('./_fails')(function () {
@@ -40635,7 +41955,7 @@ module.exports = require('./_library') || !require('./_fails')(function () {
   delete require('./_global')[K];
 });
 
-},{"./_fails":277,"./_global":282,"./_library":301}],316:[function(require,module,exports){
+},{"./_fails":289,"./_global":294,"./_library":313}],328:[function(require,module,exports){
 var pIE = require('./_object-pie');
 var createDesc = require('./_property-desc');
 var toIObject = require('./_to-iobject');
@@ -40653,7 +41973,7 @@ exports.f = require('./_descriptors') ? gOPD : function getOwnPropertyDescriptor
   if (has(O, P)) return createDesc(!pIE.f.call(O, P), O[P]);
 };
 
-},{"./_descriptors":271,"./_has":283,"./_ie8-dom-define":286,"./_object-pie":323,"./_property-desc":331,"./_to-iobject":356,"./_to-primitive":359}],317:[function(require,module,exports){
+},{"./_descriptors":283,"./_has":295,"./_ie8-dom-define":298,"./_object-pie":335,"./_property-desc":343,"./_to-iobject":368,"./_to-primitive":371}],329:[function(require,module,exports){
 // fallback for IE11 buggy Object.getOwnPropertyNames with iframe and window
 var toIObject = require('./_to-iobject');
 var gOPN = require('./_object-gopn').f;
@@ -40674,7 +41994,7 @@ module.exports.f = function getOwnPropertyNames(it) {
   return windowNames && toString.call(it) == '[object Window]' ? getWindowNames(it) : gOPN(toIObject(it));
 };
 
-},{"./_object-gopn":318,"./_to-iobject":356}],318:[function(require,module,exports){
+},{"./_object-gopn":330,"./_to-iobject":368}],330:[function(require,module,exports){
 // 19.1.2.7 / 15.2.3.4 Object.getOwnPropertyNames(O)
 var $keys = require('./_object-keys-internal');
 var hiddenKeys = require('./_enum-bug-keys').concat('length', 'prototype');
@@ -40683,10 +42003,10 @@ exports.f = Object.getOwnPropertyNames || function getOwnPropertyNames(O) {
   return $keys(O, hiddenKeys);
 };
 
-},{"./_enum-bug-keys":273,"./_object-keys-internal":321}],319:[function(require,module,exports){
+},{"./_enum-bug-keys":285,"./_object-keys-internal":333}],331:[function(require,module,exports){
 exports.f = Object.getOwnPropertySymbols;
 
-},{}],320:[function(require,module,exports){
+},{}],332:[function(require,module,exports){
 // 19.1.2.9 / 15.2.3.2 Object.getPrototypeOf(O)
 var has = require('./_has');
 var toObject = require('./_to-object');
@@ -40701,7 +42021,7 @@ module.exports = Object.getPrototypeOf || function (O) {
   } return O instanceof Object ? ObjectProto : null;
 };
 
-},{"./_has":283,"./_shared-key":341,"./_to-object":358}],321:[function(require,module,exports){
+},{"./_has":295,"./_shared-key":353,"./_to-object":370}],333:[function(require,module,exports){
 var has = require('./_has');
 var toIObject = require('./_to-iobject');
 var arrayIndexOf = require('./_array-includes')(false);
@@ -40720,7 +42040,7 @@ module.exports = function (object, names) {
   return result;
 };
 
-},{"./_array-includes":253,"./_has":283,"./_shared-key":341,"./_to-iobject":356}],322:[function(require,module,exports){
+},{"./_array-includes":265,"./_has":295,"./_shared-key":353,"./_to-iobject":368}],334:[function(require,module,exports){
 // 19.1.2.14 / 15.2.3.14 Object.keys(O)
 var $keys = require('./_object-keys-internal');
 var enumBugKeys = require('./_enum-bug-keys');
@@ -40729,10 +42049,10 @@ module.exports = Object.keys || function keys(O) {
   return $keys(O, enumBugKeys);
 };
 
-},{"./_enum-bug-keys":273,"./_object-keys-internal":321}],323:[function(require,module,exports){
+},{"./_enum-bug-keys":285,"./_object-keys-internal":333}],335:[function(require,module,exports){
 exports.f = {}.propertyIsEnumerable;
 
-},{}],324:[function(require,module,exports){
+},{}],336:[function(require,module,exports){
 // most Object methods by ES6 should accept primitives
 var $export = require('./_export');
 var core = require('./_core');
@@ -40744,7 +42064,7 @@ module.exports = function (KEY, exec) {
   $export($export.S + $export.F * fails(function () { fn(1); }), 'Object', exp);
 };
 
-},{"./_core":265,"./_export":275,"./_fails":277}],325:[function(require,module,exports){
+},{"./_core":277,"./_export":287,"./_fails":289}],337:[function(require,module,exports){
 var getKeys = require('./_object-keys');
 var toIObject = require('./_to-iobject');
 var isEnum = require('./_object-pie').f;
@@ -40762,7 +42082,7 @@ module.exports = function (isEntries) {
   };
 };
 
-},{"./_object-keys":322,"./_object-pie":323,"./_to-iobject":356}],326:[function(require,module,exports){
+},{"./_object-keys":334,"./_object-pie":335,"./_to-iobject":368}],338:[function(require,module,exports){
 // all object keys, includes non-enumerable and symbols
 var gOPN = require('./_object-gopn');
 var gOPS = require('./_object-gops');
@@ -40774,7 +42094,7 @@ module.exports = Reflect && Reflect.ownKeys || function ownKeys(it) {
   return getSymbols ? keys.concat(getSymbols(it)) : keys;
 };
 
-},{"./_an-object":249,"./_global":282,"./_object-gopn":318,"./_object-gops":319}],327:[function(require,module,exports){
+},{"./_an-object":261,"./_global":294,"./_object-gopn":330,"./_object-gops":331}],339:[function(require,module,exports){
 var $parseFloat = require('./_global').parseFloat;
 var $trim = require('./_string-trim').trim;
 
@@ -40784,7 +42104,7 @@ module.exports = 1 / $parseFloat(require('./_string-ws') + '-0') !== -Infinity ?
   return result === 0 && string.charAt(0) == '-' ? -0 : result;
 } : $parseFloat;
 
-},{"./_global":282,"./_string-trim":350,"./_string-ws":351}],328:[function(require,module,exports){
+},{"./_global":294,"./_string-trim":362,"./_string-ws":363}],340:[function(require,module,exports){
 var $parseInt = require('./_global').parseInt;
 var $trim = require('./_string-trim').trim;
 var ws = require('./_string-ws');
@@ -40795,7 +42115,7 @@ module.exports = $parseInt(ws + '08') !== 8 || $parseInt(ws + '0x16') !== 22 ? f
   return $parseInt(string, (radix >>> 0) || (hex.test(string) ? 16 : 10));
 } : $parseInt;
 
-},{"./_global":282,"./_string-trim":350,"./_string-ws":351}],329:[function(require,module,exports){
+},{"./_global":294,"./_string-trim":362,"./_string-ws":363}],341:[function(require,module,exports){
 module.exports = function (exec) {
   try {
     return { e: false, v: exec() };
@@ -40804,7 +42124,7 @@ module.exports = function (exec) {
   }
 };
 
-},{}],330:[function(require,module,exports){
+},{}],342:[function(require,module,exports){
 var anObject = require('./_an-object');
 var isObject = require('./_is-object');
 var newPromiseCapability = require('./_new-promise-capability');
@@ -40818,7 +42138,7 @@ module.exports = function (C, x) {
   return promiseCapability.promise;
 };
 
-},{"./_an-object":249,"./_is-object":293,"./_new-promise-capability":310}],331:[function(require,module,exports){
+},{"./_an-object":261,"./_is-object":305,"./_new-promise-capability":322}],343:[function(require,module,exports){
 module.exports = function (bitmap, value) {
   return {
     enumerable: !(bitmap & 1),
@@ -40828,14 +42148,14 @@ module.exports = function (bitmap, value) {
   };
 };
 
-},{}],332:[function(require,module,exports){
+},{}],344:[function(require,module,exports){
 var redefine = require('./_redefine');
 module.exports = function (target, src, safe) {
   for (var key in src) redefine(target, key, src[key], safe);
   return target;
 };
 
-},{"./_redefine":333}],333:[function(require,module,exports){
+},{"./_redefine":345}],345:[function(require,module,exports){
 var global = require('./_global');
 var hide = require('./_hide');
 var has = require('./_has');
@@ -40868,7 +42188,7 @@ require('./_core').inspectSource = function (it) {
   return typeof this == 'function' && this[SRC] || $toString.call(this);
 });
 
-},{"./_core":265,"./_global":282,"./_has":283,"./_hide":284,"./_uid":363}],334:[function(require,module,exports){
+},{"./_core":277,"./_global":294,"./_has":295,"./_hide":296,"./_uid":375}],346:[function(require,module,exports){
 module.exports = function (regExp, replace) {
   var replacer = replace === Object(replace) ? function (part) {
     return replace[part];
@@ -40878,14 +42198,14 @@ module.exports = function (regExp, replace) {
   };
 };
 
-},{}],335:[function(require,module,exports){
+},{}],347:[function(require,module,exports){
 // 7.2.9 SameValue(x, y)
 module.exports = Object.is || function is(x, y) {
   // eslint-disable-next-line no-self-compare
   return x === y ? x !== 0 || 1 / x === 1 / y : x != x && y != y;
 };
 
-},{}],336:[function(require,module,exports){
+},{}],348:[function(require,module,exports){
 'use strict';
 // https://tc39.github.io/proposal-setmap-offrom/
 var $export = require('./_export');
@@ -40915,7 +42235,7 @@ module.exports = function (COLLECTION) {
   } });
 };
 
-},{"./_a-function":245,"./_ctx":267,"./_export":275,"./_for-of":281}],337:[function(require,module,exports){
+},{"./_a-function":257,"./_ctx":279,"./_export":287,"./_for-of":293}],349:[function(require,module,exports){
 'use strict';
 // https://tc39.github.io/proposal-setmap-offrom/
 var $export = require('./_export');
@@ -40929,7 +42249,7 @@ module.exports = function (COLLECTION) {
   } });
 };
 
-},{"./_export":275}],338:[function(require,module,exports){
+},{"./_export":287}],350:[function(require,module,exports){
 // Works with __proto__ only. Old v8 can't work with null proto objects.
 /* eslint-disable no-proto */
 var isObject = require('./_is-object');
@@ -40956,7 +42276,7 @@ module.exports = {
   check: check
 };
 
-},{"./_an-object":249,"./_ctx":267,"./_is-object":293,"./_object-gopd":316}],339:[function(require,module,exports){
+},{"./_an-object":261,"./_ctx":279,"./_is-object":305,"./_object-gopd":328}],351:[function(require,module,exports){
 'use strict';
 var global = require('./_global');
 var dP = require('./_object-dp');
@@ -40971,7 +42291,7 @@ module.exports = function (KEY) {
   });
 };
 
-},{"./_descriptors":271,"./_global":282,"./_object-dp":313,"./_wks":368}],340:[function(require,module,exports){
+},{"./_descriptors":283,"./_global":294,"./_object-dp":325,"./_wks":380}],352:[function(require,module,exports){
 var def = require('./_object-dp').f;
 var has = require('./_has');
 var TAG = require('./_wks')('toStringTag');
@@ -40980,14 +42300,14 @@ module.exports = function (it, tag, stat) {
   if (it && !has(it = stat ? it : it.prototype, TAG)) def(it, TAG, { configurable: true, value: tag });
 };
 
-},{"./_has":283,"./_object-dp":313,"./_wks":368}],341:[function(require,module,exports){
+},{"./_has":295,"./_object-dp":325,"./_wks":380}],353:[function(require,module,exports){
 var shared = require('./_shared')('keys');
 var uid = require('./_uid');
 module.exports = function (key) {
   return shared[key] || (shared[key] = uid(key));
 };
 
-},{"./_shared":342,"./_uid":363}],342:[function(require,module,exports){
+},{"./_shared":354,"./_uid":375}],354:[function(require,module,exports){
 var core = require('./_core');
 var global = require('./_global');
 var SHARED = '__core-js_shared__';
@@ -41001,7 +42321,7 @@ var store = global[SHARED] || (global[SHARED] = {});
   copyright: '© 2018 Denis Pushkarev (zloirock.ru)'
 });
 
-},{"./_core":265,"./_global":282,"./_library":301}],343:[function(require,module,exports){
+},{"./_core":277,"./_global":294,"./_library":313}],355:[function(require,module,exports){
 // 7.3.20 SpeciesConstructor(O, defaultConstructor)
 var anObject = require('./_an-object');
 var aFunction = require('./_a-function');
@@ -41012,7 +42332,7 @@ module.exports = function (O, D) {
   return C === undefined || (S = anObject(C)[SPECIES]) == undefined ? D : aFunction(S);
 };
 
-},{"./_a-function":245,"./_an-object":249,"./_wks":368}],344:[function(require,module,exports){
+},{"./_a-function":257,"./_an-object":261,"./_wks":380}],356:[function(require,module,exports){
 'use strict';
 var fails = require('./_fails');
 
@@ -41023,7 +42343,7 @@ module.exports = function (method, arg) {
   });
 };
 
-},{"./_fails":277}],345:[function(require,module,exports){
+},{"./_fails":289}],357:[function(require,module,exports){
 var toInteger = require('./_to-integer');
 var defined = require('./_defined');
 // true  -> String#at
@@ -41042,7 +42362,7 @@ module.exports = function (TO_STRING) {
   };
 };
 
-},{"./_defined":270,"./_to-integer":355}],346:[function(require,module,exports){
+},{"./_defined":282,"./_to-integer":367}],358:[function(require,module,exports){
 // helper for String#{startsWith, endsWith, includes}
 var isRegExp = require('./_is-regexp');
 var defined = require('./_defined');
@@ -41052,7 +42372,7 @@ module.exports = function (that, searchString, NAME) {
   return String(defined(that));
 };
 
-},{"./_defined":270,"./_is-regexp":294}],347:[function(require,module,exports){
+},{"./_defined":282,"./_is-regexp":306}],359:[function(require,module,exports){
 var $export = require('./_export');
 var fails = require('./_fails');
 var defined = require('./_defined');
@@ -41073,7 +42393,7 @@ module.exports = function (NAME, exec) {
   }), 'String', O);
 };
 
-},{"./_defined":270,"./_export":275,"./_fails":277}],348:[function(require,module,exports){
+},{"./_defined":282,"./_export":287,"./_fails":289}],360:[function(require,module,exports){
 // https://github.com/tc39/proposal-string-pad-start-end
 var toLength = require('./_to-length');
 var repeat = require('./_string-repeat');
@@ -41091,7 +42411,7 @@ module.exports = function (that, maxLength, fillString, left) {
   return left ? stringFiller + S : S + stringFiller;
 };
 
-},{"./_defined":270,"./_string-repeat":349,"./_to-length":357}],349:[function(require,module,exports){
+},{"./_defined":282,"./_string-repeat":361,"./_to-length":369}],361:[function(require,module,exports){
 'use strict';
 var toInteger = require('./_to-integer');
 var defined = require('./_defined');
@@ -41105,7 +42425,7 @@ module.exports = function repeat(count) {
   return res;
 };
 
-},{"./_defined":270,"./_to-integer":355}],350:[function(require,module,exports){
+},{"./_defined":282,"./_to-integer":367}],362:[function(require,module,exports){
 var $export = require('./_export');
 var defined = require('./_defined');
 var fails = require('./_fails');
@@ -41137,11 +42457,11 @@ var trim = exporter.trim = function (string, TYPE) {
 
 module.exports = exporter;
 
-},{"./_defined":270,"./_export":275,"./_fails":277,"./_string-ws":351}],351:[function(require,module,exports){
+},{"./_defined":282,"./_export":287,"./_fails":289,"./_string-ws":363}],363:[function(require,module,exports){
 module.exports = '\x09\x0A\x0B\x0C\x0D\x20\xA0\u1680\u180E\u2000\u2001\u2002\u2003' +
   '\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\u2028\u2029\uFEFF';
 
-},{}],352:[function(require,module,exports){
+},{}],364:[function(require,module,exports){
 var ctx = require('./_ctx');
 var invoke = require('./_invoke');
 var html = require('./_html');
@@ -41227,7 +42547,7 @@ module.exports = {
   clear: clearTask
 };
 
-},{"./_cof":260,"./_ctx":267,"./_dom-create":272,"./_global":282,"./_html":285,"./_invoke":288}],353:[function(require,module,exports){
+},{"./_cof":272,"./_ctx":279,"./_dom-create":284,"./_global":294,"./_html":297,"./_invoke":300}],365:[function(require,module,exports){
 var toInteger = require('./_to-integer');
 var max = Math.max;
 var min = Math.min;
@@ -41236,7 +42556,7 @@ module.exports = function (index, length) {
   return index < 0 ? max(index + length, 0) : min(index, length);
 };
 
-},{"./_to-integer":355}],354:[function(require,module,exports){
+},{"./_to-integer":367}],366:[function(require,module,exports){
 // https://tc39.github.io/ecma262/#sec-toindex
 var toInteger = require('./_to-integer');
 var toLength = require('./_to-length');
@@ -41248,7 +42568,7 @@ module.exports = function (it) {
   return length;
 };
 
-},{"./_to-integer":355,"./_to-length":357}],355:[function(require,module,exports){
+},{"./_to-integer":367,"./_to-length":369}],367:[function(require,module,exports){
 // 7.1.4 ToInteger
 var ceil = Math.ceil;
 var floor = Math.floor;
@@ -41256,7 +42576,7 @@ module.exports = function (it) {
   return isNaN(it = +it) ? 0 : (it > 0 ? floor : ceil)(it);
 };
 
-},{}],356:[function(require,module,exports){
+},{}],368:[function(require,module,exports){
 // to indexed object, toObject with fallback for non-array-like ES3 strings
 var IObject = require('./_iobject');
 var defined = require('./_defined');
@@ -41264,7 +42584,7 @@ module.exports = function (it) {
   return IObject(defined(it));
 };
 
-},{"./_defined":270,"./_iobject":289}],357:[function(require,module,exports){
+},{"./_defined":282,"./_iobject":301}],369:[function(require,module,exports){
 // 7.1.15 ToLength
 var toInteger = require('./_to-integer');
 var min = Math.min;
@@ -41272,14 +42592,14 @@ module.exports = function (it) {
   return it > 0 ? min(toInteger(it), 0x1fffffffffffff) : 0; // pow(2, 53) - 1 == 9007199254740991
 };
 
-},{"./_to-integer":355}],358:[function(require,module,exports){
+},{"./_to-integer":367}],370:[function(require,module,exports){
 // 7.1.13 ToObject(argument)
 var defined = require('./_defined');
 module.exports = function (it) {
   return Object(defined(it));
 };
 
-},{"./_defined":270}],359:[function(require,module,exports){
+},{"./_defined":282}],371:[function(require,module,exports){
 // 7.1.1 ToPrimitive(input [, PreferredType])
 var isObject = require('./_is-object');
 // instead of the ES6 spec version, we didn't implement @@toPrimitive case
@@ -41293,7 +42613,7 @@ module.exports = function (it, S) {
   throw TypeError("Can't convert object to primitive value");
 };
 
-},{"./_is-object":293}],360:[function(require,module,exports){
+},{"./_is-object":305}],372:[function(require,module,exports){
 'use strict';
 if (require('./_descriptors')) {
   var LIBRARY = require('./_library');
@@ -41775,7 +43095,7 @@ if (require('./_descriptors')) {
   };
 } else module.exports = function () { /* empty */ };
 
-},{"./_an-instance":248,"./_array-copy-within":250,"./_array-fill":251,"./_array-includes":253,"./_array-methods":254,"./_classof":259,"./_ctx":267,"./_descriptors":271,"./_export":275,"./_fails":277,"./_global":282,"./_has":283,"./_hide":284,"./_is-array-iter":290,"./_is-object":293,"./_iter-detect":298,"./_iterators":300,"./_library":301,"./_object-create":312,"./_object-dp":313,"./_object-gopd":316,"./_object-gopn":318,"./_object-gpo":320,"./_property-desc":331,"./_redefine-all":332,"./_set-species":339,"./_species-constructor":343,"./_to-absolute-index":353,"./_to-index":354,"./_to-integer":355,"./_to-length":357,"./_to-object":358,"./_to-primitive":359,"./_typed":362,"./_typed-buffer":361,"./_uid":363,"./_wks":368,"./core.get-iterator-method":369,"./es6.array.iterator":381}],361:[function(require,module,exports){
+},{"./_an-instance":260,"./_array-copy-within":262,"./_array-fill":263,"./_array-includes":265,"./_array-methods":266,"./_classof":271,"./_ctx":279,"./_descriptors":283,"./_export":287,"./_fails":289,"./_global":294,"./_has":295,"./_hide":296,"./_is-array-iter":302,"./_is-object":305,"./_iter-detect":310,"./_iterators":312,"./_library":313,"./_object-create":324,"./_object-dp":325,"./_object-gopd":328,"./_object-gopn":330,"./_object-gpo":332,"./_property-desc":343,"./_redefine-all":344,"./_set-species":351,"./_species-constructor":355,"./_to-absolute-index":365,"./_to-index":366,"./_to-integer":367,"./_to-length":369,"./_to-object":370,"./_to-primitive":371,"./_typed":374,"./_typed-buffer":373,"./_uid":375,"./_wks":380,"./core.get-iterator-method":381,"./es6.array.iterator":393}],373:[function(require,module,exports){
 'use strict';
 var global = require('./_global');
 var DESCRIPTORS = require('./_descriptors');
@@ -42053,7 +43373,7 @@ hide($DataView[PROTOTYPE], $typed.VIEW, true);
 exports[ARRAY_BUFFER] = $ArrayBuffer;
 exports[DATA_VIEW] = $DataView;
 
-},{"./_an-instance":248,"./_array-fill":251,"./_descriptors":271,"./_fails":277,"./_global":282,"./_hide":284,"./_library":301,"./_object-dp":313,"./_object-gopn":318,"./_redefine-all":332,"./_set-to-string-tag":340,"./_to-index":354,"./_to-integer":355,"./_to-length":357,"./_typed":362}],362:[function(require,module,exports){
+},{"./_an-instance":260,"./_array-fill":263,"./_descriptors":283,"./_fails":289,"./_global":294,"./_hide":296,"./_library":313,"./_object-dp":325,"./_object-gopn":330,"./_redefine-all":344,"./_set-to-string-tag":352,"./_to-index":366,"./_to-integer":367,"./_to-length":369,"./_typed":374}],374:[function(require,module,exports){
 var global = require('./_global');
 var hide = require('./_hide');
 var uid = require('./_uid');
@@ -42083,27 +43403,27 @@ module.exports = {
   VIEW: VIEW
 };
 
-},{"./_global":282,"./_hide":284,"./_uid":363}],363:[function(require,module,exports){
+},{"./_global":294,"./_hide":296,"./_uid":375}],375:[function(require,module,exports){
 var id = 0;
 var px = Math.random();
 module.exports = function (key) {
   return 'Symbol('.concat(key === undefined ? '' : key, ')_', (++id + px).toString(36));
 };
 
-},{}],364:[function(require,module,exports){
+},{}],376:[function(require,module,exports){
 var global = require('./_global');
 var navigator = global.navigator;
 
 module.exports = navigator && navigator.userAgent || '';
 
-},{"./_global":282}],365:[function(require,module,exports){
+},{"./_global":294}],377:[function(require,module,exports){
 var isObject = require('./_is-object');
 module.exports = function (it, TYPE) {
   if (!isObject(it) || it._t !== TYPE) throw TypeError('Incompatible receiver, ' + TYPE + ' required!');
   return it;
 };
 
-},{"./_is-object":293}],366:[function(require,module,exports){
+},{"./_is-object":305}],378:[function(require,module,exports){
 var global = require('./_global');
 var core = require('./_core');
 var LIBRARY = require('./_library');
@@ -42114,10 +43434,10 @@ module.exports = function (name) {
   if (name.charAt(0) != '_' && !(name in $Symbol)) defineProperty($Symbol, name, { value: wksExt.f(name) });
 };
 
-},{"./_core":265,"./_global":282,"./_library":301,"./_object-dp":313,"./_wks-ext":367}],367:[function(require,module,exports){
+},{"./_core":277,"./_global":294,"./_library":313,"./_object-dp":325,"./_wks-ext":379}],379:[function(require,module,exports){
 exports.f = require('./_wks');
 
-},{"./_wks":368}],368:[function(require,module,exports){
+},{"./_wks":380}],380:[function(require,module,exports){
 var store = require('./_shared')('wks');
 var uid = require('./_uid');
 var Symbol = require('./_global').Symbol;
@@ -42130,7 +43450,7 @@ var $exports = module.exports = function (name) {
 
 $exports.store = store;
 
-},{"./_global":282,"./_shared":342,"./_uid":363}],369:[function(require,module,exports){
+},{"./_global":294,"./_shared":354,"./_uid":375}],381:[function(require,module,exports){
 var classof = require('./_classof');
 var ITERATOR = require('./_wks')('iterator');
 var Iterators = require('./_iterators');
@@ -42140,14 +43460,14 @@ module.exports = require('./_core').getIteratorMethod = function (it) {
     || Iterators[classof(it)];
 };
 
-},{"./_classof":259,"./_core":265,"./_iterators":300,"./_wks":368}],370:[function(require,module,exports){
+},{"./_classof":271,"./_core":277,"./_iterators":312,"./_wks":380}],382:[function(require,module,exports){
 // https://github.com/benjamingr/RexExp.escape
 var $export = require('./_export');
 var $re = require('./_replacer')(/[\\^$*+?.()|[\]{}]/g, '\\$&');
 
 $export($export.S, 'RegExp', { escape: function escape(it) { return $re(it); } });
 
-},{"./_export":275,"./_replacer":334}],371:[function(require,module,exports){
+},{"./_export":287,"./_replacer":346}],383:[function(require,module,exports){
 // 22.1.3.3 Array.prototype.copyWithin(target, start, end = this.length)
 var $export = require('./_export');
 
@@ -42155,7 +43475,7 @@ $export($export.P, 'Array', { copyWithin: require('./_array-copy-within') });
 
 require('./_add-to-unscopables')('copyWithin');
 
-},{"./_add-to-unscopables":247,"./_array-copy-within":250,"./_export":275}],372:[function(require,module,exports){
+},{"./_add-to-unscopables":259,"./_array-copy-within":262,"./_export":287}],384:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $every = require('./_array-methods')(4);
@@ -42167,7 +43487,7 @@ $export($export.P + $export.F * !require('./_strict-method')([].every, true), 'A
   }
 });
 
-},{"./_array-methods":254,"./_export":275,"./_strict-method":344}],373:[function(require,module,exports){
+},{"./_array-methods":266,"./_export":287,"./_strict-method":356}],385:[function(require,module,exports){
 // 22.1.3.6 Array.prototype.fill(value, start = 0, end = this.length)
 var $export = require('./_export');
 
@@ -42175,7 +43495,7 @@ $export($export.P, 'Array', { fill: require('./_array-fill') });
 
 require('./_add-to-unscopables')('fill');
 
-},{"./_add-to-unscopables":247,"./_array-fill":251,"./_export":275}],374:[function(require,module,exports){
+},{"./_add-to-unscopables":259,"./_array-fill":263,"./_export":287}],386:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $filter = require('./_array-methods')(2);
@@ -42187,7 +43507,7 @@ $export($export.P + $export.F * !require('./_strict-method')([].filter, true), '
   }
 });
 
-},{"./_array-methods":254,"./_export":275,"./_strict-method":344}],375:[function(require,module,exports){
+},{"./_array-methods":266,"./_export":287,"./_strict-method":356}],387:[function(require,module,exports){
 'use strict';
 // 22.1.3.9 Array.prototype.findIndex(predicate, thisArg = undefined)
 var $export = require('./_export');
@@ -42203,7 +43523,7 @@ $export($export.P + $export.F * forced, 'Array', {
 });
 require('./_add-to-unscopables')(KEY);
 
-},{"./_add-to-unscopables":247,"./_array-methods":254,"./_export":275}],376:[function(require,module,exports){
+},{"./_add-to-unscopables":259,"./_array-methods":266,"./_export":287}],388:[function(require,module,exports){
 'use strict';
 // 22.1.3.8 Array.prototype.find(predicate, thisArg = undefined)
 var $export = require('./_export');
@@ -42219,7 +43539,7 @@ $export($export.P + $export.F * forced, 'Array', {
 });
 require('./_add-to-unscopables')(KEY);
 
-},{"./_add-to-unscopables":247,"./_array-methods":254,"./_export":275}],377:[function(require,module,exports){
+},{"./_add-to-unscopables":259,"./_array-methods":266,"./_export":287}],389:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $forEach = require('./_array-methods')(0);
@@ -42232,7 +43552,7 @@ $export($export.P + $export.F * !STRICT, 'Array', {
   }
 });
 
-},{"./_array-methods":254,"./_export":275,"./_strict-method":344}],378:[function(require,module,exports){
+},{"./_array-methods":266,"./_export":287,"./_strict-method":356}],390:[function(require,module,exports){
 'use strict';
 var ctx = require('./_ctx');
 var $export = require('./_export');
@@ -42271,7 +43591,7 @@ $export($export.S + $export.F * !require('./_iter-detect')(function (iter) { Arr
   }
 });
 
-},{"./_create-property":266,"./_ctx":267,"./_export":275,"./_is-array-iter":290,"./_iter-call":295,"./_iter-detect":298,"./_to-length":357,"./_to-object":358,"./core.get-iterator-method":369}],379:[function(require,module,exports){
+},{"./_create-property":278,"./_ctx":279,"./_export":287,"./_is-array-iter":302,"./_iter-call":307,"./_iter-detect":310,"./_to-length":369,"./_to-object":370,"./core.get-iterator-method":381}],391:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $indexOf = require('./_array-includes')(false);
@@ -42288,13 +43608,13 @@ $export($export.P + $export.F * (NEGATIVE_ZERO || !require('./_strict-method')($
   }
 });
 
-},{"./_array-includes":253,"./_export":275,"./_strict-method":344}],380:[function(require,module,exports){
+},{"./_array-includes":265,"./_export":287,"./_strict-method":356}],392:[function(require,module,exports){
 // 22.1.2.2 / 15.4.3.2 Array.isArray(arg)
 var $export = require('./_export');
 
 $export($export.S, 'Array', { isArray: require('./_is-array') });
 
-},{"./_export":275,"./_is-array":291}],381:[function(require,module,exports){
+},{"./_export":287,"./_is-array":303}],393:[function(require,module,exports){
 'use strict';
 var addToUnscopables = require('./_add-to-unscopables');
 var step = require('./_iter-step');
@@ -42330,7 +43650,7 @@ addToUnscopables('keys');
 addToUnscopables('values');
 addToUnscopables('entries');
 
-},{"./_add-to-unscopables":247,"./_iter-define":297,"./_iter-step":299,"./_iterators":300,"./_to-iobject":356}],382:[function(require,module,exports){
+},{"./_add-to-unscopables":259,"./_iter-define":309,"./_iter-step":311,"./_iterators":312,"./_to-iobject":368}],394:[function(require,module,exports){
 'use strict';
 // 22.1.3.13 Array.prototype.join(separator)
 var $export = require('./_export');
@@ -42344,7 +43664,7 @@ $export($export.P + $export.F * (require('./_iobject') != Object || !require('./
   }
 });
 
-},{"./_export":275,"./_iobject":289,"./_strict-method":344,"./_to-iobject":356}],383:[function(require,module,exports){
+},{"./_export":287,"./_iobject":301,"./_strict-method":356,"./_to-iobject":368}],395:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var toIObject = require('./_to-iobject');
@@ -42368,7 +43688,7 @@ $export($export.P + $export.F * (NEGATIVE_ZERO || !require('./_strict-method')($
   }
 });
 
-},{"./_export":275,"./_strict-method":344,"./_to-integer":355,"./_to-iobject":356,"./_to-length":357}],384:[function(require,module,exports){
+},{"./_export":287,"./_strict-method":356,"./_to-integer":367,"./_to-iobject":368,"./_to-length":369}],396:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $map = require('./_array-methods')(1);
@@ -42380,7 +43700,7 @@ $export($export.P + $export.F * !require('./_strict-method')([].map, true), 'Arr
   }
 });
 
-},{"./_array-methods":254,"./_export":275,"./_strict-method":344}],385:[function(require,module,exports){
+},{"./_array-methods":266,"./_export":287,"./_strict-method":356}],397:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var createProperty = require('./_create-property');
@@ -42401,7 +43721,7 @@ $export($export.S + $export.F * require('./_fails')(function () {
   }
 });
 
-},{"./_create-property":266,"./_export":275,"./_fails":277}],386:[function(require,module,exports){
+},{"./_create-property":278,"./_export":287,"./_fails":289}],398:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $reduce = require('./_array-reduce');
@@ -42413,7 +43733,7 @@ $export($export.P + $export.F * !require('./_strict-method')([].reduceRight, tru
   }
 });
 
-},{"./_array-reduce":255,"./_export":275,"./_strict-method":344}],387:[function(require,module,exports){
+},{"./_array-reduce":267,"./_export":287,"./_strict-method":356}],399:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $reduce = require('./_array-reduce');
@@ -42425,7 +43745,7 @@ $export($export.P + $export.F * !require('./_strict-method')([].reduce, true), '
   }
 });
 
-},{"./_array-reduce":255,"./_export":275,"./_strict-method":344}],388:[function(require,module,exports){
+},{"./_array-reduce":267,"./_export":287,"./_strict-method":356}],400:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var html = require('./_html');
@@ -42455,7 +43775,7 @@ $export($export.P + $export.F * require('./_fails')(function () {
   }
 });
 
-},{"./_cof":260,"./_export":275,"./_fails":277,"./_html":285,"./_to-absolute-index":353,"./_to-length":357}],389:[function(require,module,exports){
+},{"./_cof":272,"./_export":287,"./_fails":289,"./_html":297,"./_to-absolute-index":365,"./_to-length":369}],401:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $some = require('./_array-methods')(3);
@@ -42467,7 +43787,7 @@ $export($export.P + $export.F * !require('./_strict-method')([].some, true), 'Ar
   }
 });
 
-},{"./_array-methods":254,"./_export":275,"./_strict-method":344}],390:[function(require,module,exports){
+},{"./_array-methods":266,"./_export":287,"./_strict-method":356}],402:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var aFunction = require('./_a-function');
@@ -42492,16 +43812,16 @@ $export($export.P + $export.F * (fails(function () {
   }
 });
 
-},{"./_a-function":245,"./_export":275,"./_fails":277,"./_strict-method":344,"./_to-object":358}],391:[function(require,module,exports){
+},{"./_a-function":257,"./_export":287,"./_fails":289,"./_strict-method":356,"./_to-object":370}],403:[function(require,module,exports){
 require('./_set-species')('Array');
 
-},{"./_set-species":339}],392:[function(require,module,exports){
+},{"./_set-species":351}],404:[function(require,module,exports){
 // 20.3.3.1 / 15.9.4.4 Date.now()
 var $export = require('./_export');
 
 $export($export.S, 'Date', { now: function () { return new Date().getTime(); } });
 
-},{"./_export":275}],393:[function(require,module,exports){
+},{"./_export":287}],405:[function(require,module,exports){
 // 20.3.4.36 / 15.9.5.43 Date.prototype.toISOString()
 var $export = require('./_export');
 var toISOString = require('./_date-to-iso-string');
@@ -42511,7 +43831,7 @@ $export($export.P + $export.F * (Date.prototype.toISOString !== toISOString), 'D
   toISOString: toISOString
 });
 
-},{"./_date-to-iso-string":268,"./_export":275}],394:[function(require,module,exports){
+},{"./_date-to-iso-string":280,"./_export":287}],406:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var toObject = require('./_to-object');
@@ -42529,13 +43849,13 @@ $export($export.P + $export.F * require('./_fails')(function () {
   }
 });
 
-},{"./_export":275,"./_fails":277,"./_to-object":358,"./_to-primitive":359}],395:[function(require,module,exports){
+},{"./_export":287,"./_fails":289,"./_to-object":370,"./_to-primitive":371}],407:[function(require,module,exports){
 var TO_PRIMITIVE = require('./_wks')('toPrimitive');
 var proto = Date.prototype;
 
 if (!(TO_PRIMITIVE in proto)) require('./_hide')(proto, TO_PRIMITIVE, require('./_date-to-primitive'));
 
-},{"./_date-to-primitive":269,"./_hide":284,"./_wks":368}],396:[function(require,module,exports){
+},{"./_date-to-primitive":281,"./_hide":296,"./_wks":380}],408:[function(require,module,exports){
 var DateProto = Date.prototype;
 var INVALID_DATE = 'Invalid Date';
 var TO_STRING = 'toString';
@@ -42549,13 +43869,13 @@ if (new Date(NaN) + '' != INVALID_DATE) {
   });
 }
 
-},{"./_redefine":333}],397:[function(require,module,exports){
+},{"./_redefine":345}],409:[function(require,module,exports){
 // 19.2.3.2 / 15.3.4.5 Function.prototype.bind(thisArg, args...)
 var $export = require('./_export');
 
 $export($export.P, 'Function', { bind: require('./_bind') });
 
-},{"./_bind":258,"./_export":275}],398:[function(require,module,exports){
+},{"./_bind":270,"./_export":287}],410:[function(require,module,exports){
 'use strict';
 var isObject = require('./_is-object');
 var getPrototypeOf = require('./_object-gpo');
@@ -42570,7 +43890,7 @@ if (!(HAS_INSTANCE in FunctionProto)) require('./_object-dp').f(FunctionProto, H
   return false;
 } });
 
-},{"./_is-object":293,"./_object-dp":313,"./_object-gpo":320,"./_wks":368}],399:[function(require,module,exports){
+},{"./_is-object":305,"./_object-dp":325,"./_object-gpo":332,"./_wks":380}],411:[function(require,module,exports){
 var dP = require('./_object-dp').f;
 var FProto = Function.prototype;
 var nameRE = /^\s*function ([^ (]*)/;
@@ -42588,7 +43908,7 @@ NAME in FProto || require('./_descriptors') && dP(FProto, NAME, {
   }
 });
 
-},{"./_descriptors":271,"./_object-dp":313}],400:[function(require,module,exports){
+},{"./_descriptors":283,"./_object-dp":325}],412:[function(require,module,exports){
 'use strict';
 var strong = require('./_collection-strong');
 var validate = require('./_validate-collection');
@@ -42609,7 +43929,7 @@ module.exports = require('./_collection')(MAP, function (get) {
   }
 }, strong, true);
 
-},{"./_collection":264,"./_collection-strong":261,"./_validate-collection":365}],401:[function(require,module,exports){
+},{"./_collection":276,"./_collection-strong":273,"./_validate-collection":377}],413:[function(require,module,exports){
 // 20.2.2.3 Math.acosh(x)
 var $export = require('./_export');
 var log1p = require('./_math-log1p');
@@ -42629,7 +43949,7 @@ $export($export.S + $export.F * !($acosh
   }
 });
 
-},{"./_export":275,"./_math-log1p":304}],402:[function(require,module,exports){
+},{"./_export":287,"./_math-log1p":316}],414:[function(require,module,exports){
 // 20.2.2.5 Math.asinh(x)
 var $export = require('./_export');
 var $asinh = Math.asinh;
@@ -42641,7 +43961,7 @@ function asinh(x) {
 // Tor Browser bug: Math.asinh(0) -> -0
 $export($export.S + $export.F * !($asinh && 1 / $asinh(0) > 0), 'Math', { asinh: asinh });
 
-},{"./_export":275}],403:[function(require,module,exports){
+},{"./_export":287}],415:[function(require,module,exports){
 // 20.2.2.7 Math.atanh(x)
 var $export = require('./_export');
 var $atanh = Math.atanh;
@@ -42653,7 +43973,7 @@ $export($export.S + $export.F * !($atanh && 1 / $atanh(-0) < 0), 'Math', {
   }
 });
 
-},{"./_export":275}],404:[function(require,module,exports){
+},{"./_export":287}],416:[function(require,module,exports){
 // 20.2.2.9 Math.cbrt(x)
 var $export = require('./_export');
 var sign = require('./_math-sign');
@@ -42664,7 +43984,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275,"./_math-sign":306}],405:[function(require,module,exports){
+},{"./_export":287,"./_math-sign":318}],417:[function(require,module,exports){
 // 20.2.2.11 Math.clz32(x)
 var $export = require('./_export');
 
@@ -42674,7 +43994,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],406:[function(require,module,exports){
+},{"./_export":287}],418:[function(require,module,exports){
 // 20.2.2.12 Math.cosh(x)
 var $export = require('./_export');
 var exp = Math.exp;
@@ -42685,20 +44005,20 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],407:[function(require,module,exports){
+},{"./_export":287}],419:[function(require,module,exports){
 // 20.2.2.14 Math.expm1(x)
 var $export = require('./_export');
 var $expm1 = require('./_math-expm1');
 
 $export($export.S + $export.F * ($expm1 != Math.expm1), 'Math', { expm1: $expm1 });
 
-},{"./_export":275,"./_math-expm1":302}],408:[function(require,module,exports){
+},{"./_export":287,"./_math-expm1":314}],420:[function(require,module,exports){
 // 20.2.2.16 Math.fround(x)
 var $export = require('./_export');
 
 $export($export.S, 'Math', { fround: require('./_math-fround') });
 
-},{"./_export":275,"./_math-fround":303}],409:[function(require,module,exports){
+},{"./_export":287,"./_math-fround":315}],421:[function(require,module,exports){
 // 20.2.2.17 Math.hypot([value1[, value2[, … ]]])
 var $export = require('./_export');
 var abs = Math.abs;
@@ -42725,7 +44045,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],410:[function(require,module,exports){
+},{"./_export":287}],422:[function(require,module,exports){
 // 20.2.2.18 Math.imul(x, y)
 var $export = require('./_export');
 var $imul = Math.imul;
@@ -42744,7 +44064,7 @@ $export($export.S + $export.F * require('./_fails')(function () {
   }
 });
 
-},{"./_export":275,"./_fails":277}],411:[function(require,module,exports){
+},{"./_export":287,"./_fails":289}],423:[function(require,module,exports){
 // 20.2.2.21 Math.log10(x)
 var $export = require('./_export');
 
@@ -42754,13 +44074,13 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],412:[function(require,module,exports){
+},{"./_export":287}],424:[function(require,module,exports){
 // 20.2.2.20 Math.log1p(x)
 var $export = require('./_export');
 
 $export($export.S, 'Math', { log1p: require('./_math-log1p') });
 
-},{"./_export":275,"./_math-log1p":304}],413:[function(require,module,exports){
+},{"./_export":287,"./_math-log1p":316}],425:[function(require,module,exports){
 // 20.2.2.22 Math.log2(x)
 var $export = require('./_export');
 
@@ -42770,13 +44090,13 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],414:[function(require,module,exports){
+},{"./_export":287}],426:[function(require,module,exports){
 // 20.2.2.28 Math.sign(x)
 var $export = require('./_export');
 
 $export($export.S, 'Math', { sign: require('./_math-sign') });
 
-},{"./_export":275,"./_math-sign":306}],415:[function(require,module,exports){
+},{"./_export":287,"./_math-sign":318}],427:[function(require,module,exports){
 // 20.2.2.30 Math.sinh(x)
 var $export = require('./_export');
 var expm1 = require('./_math-expm1');
@@ -42793,7 +44113,7 @@ $export($export.S + $export.F * require('./_fails')(function () {
   }
 });
 
-},{"./_export":275,"./_fails":277,"./_math-expm1":302}],416:[function(require,module,exports){
+},{"./_export":287,"./_fails":289,"./_math-expm1":314}],428:[function(require,module,exports){
 // 20.2.2.33 Math.tanh(x)
 var $export = require('./_export');
 var expm1 = require('./_math-expm1');
@@ -42807,7 +44127,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275,"./_math-expm1":302}],417:[function(require,module,exports){
+},{"./_export":287,"./_math-expm1":314}],429:[function(require,module,exports){
 // 20.2.2.34 Math.trunc(x)
 var $export = require('./_export');
 
@@ -42817,7 +44137,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],418:[function(require,module,exports){
+},{"./_export":287}],430:[function(require,module,exports){
 'use strict';
 var global = require('./_global');
 var has = require('./_has');
@@ -42888,13 +44208,13 @@ if (!$Number(' 0o1') || !$Number('0b1') || $Number('+0x1')) {
   require('./_redefine')(global, NUMBER, $Number);
 }
 
-},{"./_cof":260,"./_descriptors":271,"./_fails":277,"./_global":282,"./_has":283,"./_inherit-if-required":287,"./_object-create":312,"./_object-dp":313,"./_object-gopd":316,"./_object-gopn":318,"./_redefine":333,"./_string-trim":350,"./_to-primitive":359}],419:[function(require,module,exports){
+},{"./_cof":272,"./_descriptors":283,"./_fails":289,"./_global":294,"./_has":295,"./_inherit-if-required":299,"./_object-create":324,"./_object-dp":325,"./_object-gopd":328,"./_object-gopn":330,"./_redefine":345,"./_string-trim":362,"./_to-primitive":371}],431:[function(require,module,exports){
 // 20.1.2.1 Number.EPSILON
 var $export = require('./_export');
 
 $export($export.S, 'Number', { EPSILON: Math.pow(2, -52) });
 
-},{"./_export":275}],420:[function(require,module,exports){
+},{"./_export":287}],432:[function(require,module,exports){
 // 20.1.2.2 Number.isFinite(number)
 var $export = require('./_export');
 var _isFinite = require('./_global').isFinite;
@@ -42905,13 +44225,13 @@ $export($export.S, 'Number', {
   }
 });
 
-},{"./_export":275,"./_global":282}],421:[function(require,module,exports){
+},{"./_export":287,"./_global":294}],433:[function(require,module,exports){
 // 20.1.2.3 Number.isInteger(number)
 var $export = require('./_export');
 
 $export($export.S, 'Number', { isInteger: require('./_is-integer') });
 
-},{"./_export":275,"./_is-integer":292}],422:[function(require,module,exports){
+},{"./_export":287,"./_is-integer":304}],434:[function(require,module,exports){
 // 20.1.2.4 Number.isNaN(number)
 var $export = require('./_export');
 
@@ -42922,7 +44242,7 @@ $export($export.S, 'Number', {
   }
 });
 
-},{"./_export":275}],423:[function(require,module,exports){
+},{"./_export":287}],435:[function(require,module,exports){
 // 20.1.2.5 Number.isSafeInteger(number)
 var $export = require('./_export');
 var isInteger = require('./_is-integer');
@@ -42934,31 +44254,31 @@ $export($export.S, 'Number', {
   }
 });
 
-},{"./_export":275,"./_is-integer":292}],424:[function(require,module,exports){
+},{"./_export":287,"./_is-integer":304}],436:[function(require,module,exports){
 // 20.1.2.6 Number.MAX_SAFE_INTEGER
 var $export = require('./_export');
 
 $export($export.S, 'Number', { MAX_SAFE_INTEGER: 0x1fffffffffffff });
 
-},{"./_export":275}],425:[function(require,module,exports){
+},{"./_export":287}],437:[function(require,module,exports){
 // 20.1.2.10 Number.MIN_SAFE_INTEGER
 var $export = require('./_export');
 
 $export($export.S, 'Number', { MIN_SAFE_INTEGER: -0x1fffffffffffff });
 
-},{"./_export":275}],426:[function(require,module,exports){
+},{"./_export":287}],438:[function(require,module,exports){
 var $export = require('./_export');
 var $parseFloat = require('./_parse-float');
 // 20.1.2.12 Number.parseFloat(string)
 $export($export.S + $export.F * (Number.parseFloat != $parseFloat), 'Number', { parseFloat: $parseFloat });
 
-},{"./_export":275,"./_parse-float":327}],427:[function(require,module,exports){
+},{"./_export":287,"./_parse-float":339}],439:[function(require,module,exports){
 var $export = require('./_export');
 var $parseInt = require('./_parse-int');
 // 20.1.2.13 Number.parseInt(string, radix)
 $export($export.S + $export.F * (Number.parseInt != $parseInt), 'Number', { parseInt: $parseInt });
 
-},{"./_export":275,"./_parse-int":328}],428:[function(require,module,exports){
+},{"./_export":287,"./_parse-int":340}],440:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var toInteger = require('./_to-integer');
@@ -43074,7 +44394,7 @@ $export($export.P + $export.F * (!!$toFixed && (
   }
 });
 
-},{"./_a-number-value":246,"./_export":275,"./_fails":277,"./_string-repeat":349,"./_to-integer":355}],429:[function(require,module,exports){
+},{"./_a-number-value":258,"./_export":287,"./_fails":289,"./_string-repeat":361,"./_to-integer":367}],441:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $fails = require('./_fails');
@@ -43094,28 +44414,28 @@ $export($export.P + $export.F * ($fails(function () {
   }
 });
 
-},{"./_a-number-value":246,"./_export":275,"./_fails":277}],430:[function(require,module,exports){
+},{"./_a-number-value":258,"./_export":287,"./_fails":289}],442:[function(require,module,exports){
 // 19.1.3.1 Object.assign(target, source)
 var $export = require('./_export');
 
 $export($export.S + $export.F, 'Object', { assign: require('./_object-assign') });
 
-},{"./_export":275,"./_object-assign":311}],431:[function(require,module,exports){
+},{"./_export":287,"./_object-assign":323}],443:[function(require,module,exports){
 var $export = require('./_export');
 // 19.1.2.2 / 15.2.3.5 Object.create(O [, Properties])
 $export($export.S, 'Object', { create: require('./_object-create') });
 
-},{"./_export":275,"./_object-create":312}],432:[function(require,module,exports){
+},{"./_export":287,"./_object-create":324}],444:[function(require,module,exports){
 var $export = require('./_export');
 // 19.1.2.3 / 15.2.3.7 Object.defineProperties(O, Properties)
 $export($export.S + $export.F * !require('./_descriptors'), 'Object', { defineProperties: require('./_object-dps') });
 
-},{"./_descriptors":271,"./_export":275,"./_object-dps":314}],433:[function(require,module,exports){
+},{"./_descriptors":283,"./_export":287,"./_object-dps":326}],445:[function(require,module,exports){
 var $export = require('./_export');
 // 19.1.2.4 / 15.2.3.6 Object.defineProperty(O, P, Attributes)
 $export($export.S + $export.F * !require('./_descriptors'), 'Object', { defineProperty: require('./_object-dp').f });
 
-},{"./_descriptors":271,"./_export":275,"./_object-dp":313}],434:[function(require,module,exports){
+},{"./_descriptors":283,"./_export":287,"./_object-dp":325}],446:[function(require,module,exports){
 // 19.1.2.5 Object.freeze(O)
 var isObject = require('./_is-object');
 var meta = require('./_meta').onFreeze;
@@ -43126,7 +44446,7 @@ require('./_object-sap')('freeze', function ($freeze) {
   };
 });
 
-},{"./_is-object":293,"./_meta":307,"./_object-sap":324}],435:[function(require,module,exports){
+},{"./_is-object":305,"./_meta":319,"./_object-sap":336}],447:[function(require,module,exports){
 // 19.1.2.6 Object.getOwnPropertyDescriptor(O, P)
 var toIObject = require('./_to-iobject');
 var $getOwnPropertyDescriptor = require('./_object-gopd').f;
@@ -43137,13 +44457,13 @@ require('./_object-sap')('getOwnPropertyDescriptor', function () {
   };
 });
 
-},{"./_object-gopd":316,"./_object-sap":324,"./_to-iobject":356}],436:[function(require,module,exports){
+},{"./_object-gopd":328,"./_object-sap":336,"./_to-iobject":368}],448:[function(require,module,exports){
 // 19.1.2.7 Object.getOwnPropertyNames(O)
 require('./_object-sap')('getOwnPropertyNames', function () {
   return require('./_object-gopn-ext').f;
 });
 
-},{"./_object-gopn-ext":317,"./_object-sap":324}],437:[function(require,module,exports){
+},{"./_object-gopn-ext":329,"./_object-sap":336}],449:[function(require,module,exports){
 // 19.1.2.9 Object.getPrototypeOf(O)
 var toObject = require('./_to-object');
 var $getPrototypeOf = require('./_object-gpo');
@@ -43154,7 +44474,7 @@ require('./_object-sap')('getPrototypeOf', function () {
   };
 });
 
-},{"./_object-gpo":320,"./_object-sap":324,"./_to-object":358}],438:[function(require,module,exports){
+},{"./_object-gpo":332,"./_object-sap":336,"./_to-object":370}],450:[function(require,module,exports){
 // 19.1.2.11 Object.isExtensible(O)
 var isObject = require('./_is-object');
 
@@ -43164,7 +44484,7 @@ require('./_object-sap')('isExtensible', function ($isExtensible) {
   };
 });
 
-},{"./_is-object":293,"./_object-sap":324}],439:[function(require,module,exports){
+},{"./_is-object":305,"./_object-sap":336}],451:[function(require,module,exports){
 // 19.1.2.12 Object.isFrozen(O)
 var isObject = require('./_is-object');
 
@@ -43174,7 +44494,7 @@ require('./_object-sap')('isFrozen', function ($isFrozen) {
   };
 });
 
-},{"./_is-object":293,"./_object-sap":324}],440:[function(require,module,exports){
+},{"./_is-object":305,"./_object-sap":336}],452:[function(require,module,exports){
 // 19.1.2.13 Object.isSealed(O)
 var isObject = require('./_is-object');
 
@@ -43184,12 +44504,12 @@ require('./_object-sap')('isSealed', function ($isSealed) {
   };
 });
 
-},{"./_is-object":293,"./_object-sap":324}],441:[function(require,module,exports){
+},{"./_is-object":305,"./_object-sap":336}],453:[function(require,module,exports){
 // 19.1.3.10 Object.is(value1, value2)
 var $export = require('./_export');
 $export($export.S, 'Object', { is: require('./_same-value') });
 
-},{"./_export":275,"./_same-value":335}],442:[function(require,module,exports){
+},{"./_export":287,"./_same-value":347}],454:[function(require,module,exports){
 // 19.1.2.14 Object.keys(O)
 var toObject = require('./_to-object');
 var $keys = require('./_object-keys');
@@ -43200,7 +44520,7 @@ require('./_object-sap')('keys', function () {
   };
 });
 
-},{"./_object-keys":322,"./_object-sap":324,"./_to-object":358}],443:[function(require,module,exports){
+},{"./_object-keys":334,"./_object-sap":336,"./_to-object":370}],455:[function(require,module,exports){
 // 19.1.2.15 Object.preventExtensions(O)
 var isObject = require('./_is-object');
 var meta = require('./_meta').onFreeze;
@@ -43211,7 +44531,7 @@ require('./_object-sap')('preventExtensions', function ($preventExtensions) {
   };
 });
 
-},{"./_is-object":293,"./_meta":307,"./_object-sap":324}],444:[function(require,module,exports){
+},{"./_is-object":305,"./_meta":319,"./_object-sap":336}],456:[function(require,module,exports){
 // 19.1.2.17 Object.seal(O)
 var isObject = require('./_is-object');
 var meta = require('./_meta').onFreeze;
@@ -43222,12 +44542,12 @@ require('./_object-sap')('seal', function ($seal) {
   };
 });
 
-},{"./_is-object":293,"./_meta":307,"./_object-sap":324}],445:[function(require,module,exports){
+},{"./_is-object":305,"./_meta":319,"./_object-sap":336}],457:[function(require,module,exports){
 // 19.1.3.19 Object.setPrototypeOf(O, proto)
 var $export = require('./_export');
 $export($export.S, 'Object', { setPrototypeOf: require('./_set-proto').set });
 
-},{"./_export":275,"./_set-proto":338}],446:[function(require,module,exports){
+},{"./_export":287,"./_set-proto":350}],458:[function(require,module,exports){
 'use strict';
 // 19.1.3.6 Object.prototype.toString()
 var classof = require('./_classof');
@@ -43239,19 +44559,19 @@ if (test + '' != '[object z]') {
   }, true);
 }
 
-},{"./_classof":259,"./_redefine":333,"./_wks":368}],447:[function(require,module,exports){
+},{"./_classof":271,"./_redefine":345,"./_wks":380}],459:[function(require,module,exports){
 var $export = require('./_export');
 var $parseFloat = require('./_parse-float');
 // 18.2.4 parseFloat(string)
 $export($export.G + $export.F * (parseFloat != $parseFloat), { parseFloat: $parseFloat });
 
-},{"./_export":275,"./_parse-float":327}],448:[function(require,module,exports){
+},{"./_export":287,"./_parse-float":339}],460:[function(require,module,exports){
 var $export = require('./_export');
 var $parseInt = require('./_parse-int');
 // 18.2.5 parseInt(string, radix)
 $export($export.G + $export.F * (parseInt != $parseInt), { parseInt: $parseInt });
 
-},{"./_export":275,"./_parse-int":328}],449:[function(require,module,exports){
+},{"./_export":287,"./_parse-int":340}],461:[function(require,module,exports){
 'use strict';
 var LIBRARY = require('./_library');
 var global = require('./_global');
@@ -43539,7 +44859,7 @@ $export($export.S + $export.F * !(USE_NATIVE && require('./_iter-detect')(functi
   }
 });
 
-},{"./_a-function":245,"./_an-instance":248,"./_classof":259,"./_core":265,"./_ctx":267,"./_export":275,"./_for-of":281,"./_global":282,"./_is-object":293,"./_iter-detect":298,"./_library":301,"./_microtask":309,"./_new-promise-capability":310,"./_perform":329,"./_promise-resolve":330,"./_redefine-all":332,"./_set-species":339,"./_set-to-string-tag":340,"./_species-constructor":343,"./_task":352,"./_user-agent":364,"./_wks":368}],450:[function(require,module,exports){
+},{"./_a-function":257,"./_an-instance":260,"./_classof":271,"./_core":277,"./_ctx":279,"./_export":287,"./_for-of":293,"./_global":294,"./_is-object":305,"./_iter-detect":310,"./_library":313,"./_microtask":321,"./_new-promise-capability":322,"./_perform":341,"./_promise-resolve":342,"./_redefine-all":344,"./_set-species":351,"./_set-to-string-tag":352,"./_species-constructor":355,"./_task":364,"./_user-agent":376,"./_wks":380}],462:[function(require,module,exports){
 // 26.1.1 Reflect.apply(target, thisArgument, argumentsList)
 var $export = require('./_export');
 var aFunction = require('./_a-function');
@@ -43557,7 +44877,7 @@ $export($export.S + $export.F * !require('./_fails')(function () {
   }
 });
 
-},{"./_a-function":245,"./_an-object":249,"./_export":275,"./_fails":277,"./_global":282}],451:[function(require,module,exports){
+},{"./_a-function":257,"./_an-object":261,"./_export":287,"./_fails":289,"./_global":294}],463:[function(require,module,exports){
 // 26.1.2 Reflect.construct(target, argumentsList [, newTarget])
 var $export = require('./_export');
 var create = require('./_object-create');
@@ -43606,7 +44926,7 @@ $export($export.S + $export.F * (NEW_TARGET_BUG || ARGS_BUG), 'Reflect', {
   }
 });
 
-},{"./_a-function":245,"./_an-object":249,"./_bind":258,"./_export":275,"./_fails":277,"./_global":282,"./_is-object":293,"./_object-create":312}],452:[function(require,module,exports){
+},{"./_a-function":257,"./_an-object":261,"./_bind":270,"./_export":287,"./_fails":289,"./_global":294,"./_is-object":305,"./_object-create":324}],464:[function(require,module,exports){
 // 26.1.3 Reflect.defineProperty(target, propertyKey, attributes)
 var dP = require('./_object-dp');
 var $export = require('./_export');
@@ -43631,7 +44951,7 @@ $export($export.S + $export.F * require('./_fails')(function () {
   }
 });
 
-},{"./_an-object":249,"./_export":275,"./_fails":277,"./_object-dp":313,"./_to-primitive":359}],453:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287,"./_fails":289,"./_object-dp":325,"./_to-primitive":371}],465:[function(require,module,exports){
 // 26.1.4 Reflect.deleteProperty(target, propertyKey)
 var $export = require('./_export');
 var gOPD = require('./_object-gopd').f;
@@ -43644,7 +44964,7 @@ $export($export.S, 'Reflect', {
   }
 });
 
-},{"./_an-object":249,"./_export":275,"./_object-gopd":316}],454:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287,"./_object-gopd":328}],466:[function(require,module,exports){
 'use strict';
 // 26.1.5 Reflect.enumerate(target)
 var $export = require('./_export');
@@ -43672,7 +44992,7 @@ $export($export.S, 'Reflect', {
   }
 });
 
-},{"./_an-object":249,"./_export":275,"./_iter-create":296}],455:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287,"./_iter-create":308}],467:[function(require,module,exports){
 // 26.1.7 Reflect.getOwnPropertyDescriptor(target, propertyKey)
 var gOPD = require('./_object-gopd');
 var $export = require('./_export');
@@ -43684,7 +45004,7 @@ $export($export.S, 'Reflect', {
   }
 });
 
-},{"./_an-object":249,"./_export":275,"./_object-gopd":316}],456:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287,"./_object-gopd":328}],468:[function(require,module,exports){
 // 26.1.8 Reflect.getPrototypeOf(target)
 var $export = require('./_export');
 var getProto = require('./_object-gpo');
@@ -43696,7 +45016,7 @@ $export($export.S, 'Reflect', {
   }
 });
 
-},{"./_an-object":249,"./_export":275,"./_object-gpo":320}],457:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287,"./_object-gpo":332}],469:[function(require,module,exports){
 // 26.1.6 Reflect.get(target, propertyKey [, receiver])
 var gOPD = require('./_object-gopd');
 var getPrototypeOf = require('./_object-gpo');
@@ -43719,7 +45039,7 @@ function get(target, propertyKey /* , receiver */) {
 
 $export($export.S, 'Reflect', { get: get });
 
-},{"./_an-object":249,"./_export":275,"./_has":283,"./_is-object":293,"./_object-gopd":316,"./_object-gpo":320}],458:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287,"./_has":295,"./_is-object":305,"./_object-gopd":328,"./_object-gpo":332}],470:[function(require,module,exports){
 // 26.1.9 Reflect.has(target, propertyKey)
 var $export = require('./_export');
 
@@ -43729,7 +45049,7 @@ $export($export.S, 'Reflect', {
   }
 });
 
-},{"./_export":275}],459:[function(require,module,exports){
+},{"./_export":287}],471:[function(require,module,exports){
 // 26.1.10 Reflect.isExtensible(target)
 var $export = require('./_export');
 var anObject = require('./_an-object');
@@ -43742,13 +45062,13 @@ $export($export.S, 'Reflect', {
   }
 });
 
-},{"./_an-object":249,"./_export":275}],460:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287}],472:[function(require,module,exports){
 // 26.1.11 Reflect.ownKeys(target)
 var $export = require('./_export');
 
 $export($export.S, 'Reflect', { ownKeys: require('./_own-keys') });
 
-},{"./_export":275,"./_own-keys":326}],461:[function(require,module,exports){
+},{"./_export":287,"./_own-keys":338}],473:[function(require,module,exports){
 // 26.1.12 Reflect.preventExtensions(target)
 var $export = require('./_export');
 var anObject = require('./_an-object');
@@ -43766,7 +45086,7 @@ $export($export.S, 'Reflect', {
   }
 });
 
-},{"./_an-object":249,"./_export":275}],462:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287}],474:[function(require,module,exports){
 // 26.1.14 Reflect.setPrototypeOf(target, proto)
 var $export = require('./_export');
 var setProto = require('./_set-proto');
@@ -43783,7 +45103,7 @@ if (setProto) $export($export.S, 'Reflect', {
   }
 });
 
-},{"./_export":275,"./_set-proto":338}],463:[function(require,module,exports){
+},{"./_export":287,"./_set-proto":350}],475:[function(require,module,exports){
 // 26.1.13 Reflect.set(target, propertyKey, V [, receiver])
 var dP = require('./_object-dp');
 var gOPD = require('./_object-gopd');
@@ -43818,7 +45138,7 @@ function set(target, propertyKey, V /* , receiver */) {
 
 $export($export.S, 'Reflect', { set: set });
 
-},{"./_an-object":249,"./_export":275,"./_has":283,"./_is-object":293,"./_object-dp":313,"./_object-gopd":316,"./_object-gpo":320,"./_property-desc":331}],464:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287,"./_has":295,"./_is-object":305,"./_object-dp":325,"./_object-gopd":328,"./_object-gpo":332,"./_property-desc":343}],476:[function(require,module,exports){
 var global = require('./_global');
 var inheritIfRequired = require('./_inherit-if-required');
 var dP = require('./_object-dp').f;
@@ -43863,14 +45183,14 @@ if (require('./_descriptors') && (!CORRECT_NEW || require('./_fails')(function (
 
 require('./_set-species')('RegExp');
 
-},{"./_descriptors":271,"./_fails":277,"./_flags":279,"./_global":282,"./_inherit-if-required":287,"./_is-regexp":294,"./_object-dp":313,"./_object-gopn":318,"./_redefine":333,"./_set-species":339,"./_wks":368}],465:[function(require,module,exports){
+},{"./_descriptors":283,"./_fails":289,"./_flags":291,"./_global":294,"./_inherit-if-required":299,"./_is-regexp":306,"./_object-dp":325,"./_object-gopn":330,"./_redefine":345,"./_set-species":351,"./_wks":380}],477:[function(require,module,exports){
 // 21.2.5.3 get RegExp.prototype.flags()
 if (require('./_descriptors') && /./g.flags != 'g') require('./_object-dp').f(RegExp.prototype, 'flags', {
   configurable: true,
   get: require('./_flags')
 });
 
-},{"./_descriptors":271,"./_flags":279,"./_object-dp":313}],466:[function(require,module,exports){
+},{"./_descriptors":283,"./_flags":291,"./_object-dp":325}],478:[function(require,module,exports){
 // @@match logic
 require('./_fix-re-wks')('match', 1, function (defined, MATCH, $match) {
   // 21.1.3.11 String.prototype.match(regexp)
@@ -43882,7 +45202,7 @@ require('./_fix-re-wks')('match', 1, function (defined, MATCH, $match) {
   }, $match];
 });
 
-},{"./_fix-re-wks":278}],467:[function(require,module,exports){
+},{"./_fix-re-wks":290}],479:[function(require,module,exports){
 // @@replace logic
 require('./_fix-re-wks')('replace', 2, function (defined, REPLACE, $replace) {
   // 21.1.3.14 String.prototype.replace(searchValue, replaceValue)
@@ -43896,7 +45216,7 @@ require('./_fix-re-wks')('replace', 2, function (defined, REPLACE, $replace) {
   }, $replace];
 });
 
-},{"./_fix-re-wks":278}],468:[function(require,module,exports){
+},{"./_fix-re-wks":290}],480:[function(require,module,exports){
 // @@search logic
 require('./_fix-re-wks')('search', 1, function (defined, SEARCH, $search) {
   // 21.1.3.15 String.prototype.search(regexp)
@@ -43908,7 +45228,7 @@ require('./_fix-re-wks')('search', 1, function (defined, SEARCH, $search) {
   }, $search];
 });
 
-},{"./_fix-re-wks":278}],469:[function(require,module,exports){
+},{"./_fix-re-wks":290}],481:[function(require,module,exports){
 // @@split logic
 require('./_fix-re-wks')('split', 2, function (defined, SPLIT, $split) {
   'use strict';
@@ -43981,7 +45301,7 @@ require('./_fix-re-wks')('split', 2, function (defined, SPLIT, $split) {
   }, $split];
 });
 
-},{"./_fix-re-wks":278,"./_is-regexp":294}],470:[function(require,module,exports){
+},{"./_fix-re-wks":290,"./_is-regexp":306}],482:[function(require,module,exports){
 'use strict';
 require('./es6.regexp.flags');
 var anObject = require('./_an-object');
@@ -44008,7 +45328,7 @@ if (require('./_fails')(function () { return $toString.call({ source: 'a', flags
   });
 }
 
-},{"./_an-object":249,"./_descriptors":271,"./_fails":277,"./_flags":279,"./_redefine":333,"./es6.regexp.flags":465}],471:[function(require,module,exports){
+},{"./_an-object":261,"./_descriptors":283,"./_fails":289,"./_flags":291,"./_redefine":345,"./es6.regexp.flags":477}],483:[function(require,module,exports){
 'use strict';
 var strong = require('./_collection-strong');
 var validate = require('./_validate-collection');
@@ -44024,7 +45344,7 @@ module.exports = require('./_collection')(SET, function (get) {
   }
 }, strong);
 
-},{"./_collection":264,"./_collection-strong":261,"./_validate-collection":365}],472:[function(require,module,exports){
+},{"./_collection":276,"./_collection-strong":273,"./_validate-collection":377}],484:[function(require,module,exports){
 'use strict';
 // B.2.3.2 String.prototype.anchor(name)
 require('./_string-html')('anchor', function (createHTML) {
@@ -44033,7 +45353,7 @@ require('./_string-html')('anchor', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],473:[function(require,module,exports){
+},{"./_string-html":359}],485:[function(require,module,exports){
 'use strict';
 // B.2.3.3 String.prototype.big()
 require('./_string-html')('big', function (createHTML) {
@@ -44042,7 +45362,7 @@ require('./_string-html')('big', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],474:[function(require,module,exports){
+},{"./_string-html":359}],486:[function(require,module,exports){
 'use strict';
 // B.2.3.4 String.prototype.blink()
 require('./_string-html')('blink', function (createHTML) {
@@ -44051,7 +45371,7 @@ require('./_string-html')('blink', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],475:[function(require,module,exports){
+},{"./_string-html":359}],487:[function(require,module,exports){
 'use strict';
 // B.2.3.5 String.prototype.bold()
 require('./_string-html')('bold', function (createHTML) {
@@ -44060,7 +45380,7 @@ require('./_string-html')('bold', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],476:[function(require,module,exports){
+},{"./_string-html":359}],488:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $at = require('./_string-at')(false);
@@ -44071,7 +45391,7 @@ $export($export.P, 'String', {
   }
 });
 
-},{"./_export":275,"./_string-at":345}],477:[function(require,module,exports){
+},{"./_export":287,"./_string-at":357}],489:[function(require,module,exports){
 // 21.1.3.6 String.prototype.endsWith(searchString [, endPosition])
 'use strict';
 var $export = require('./_export');
@@ -44093,7 +45413,7 @@ $export($export.P + $export.F * require('./_fails-is-regexp')(ENDS_WITH), 'Strin
   }
 });
 
-},{"./_export":275,"./_fails-is-regexp":276,"./_string-context":346,"./_to-length":357}],478:[function(require,module,exports){
+},{"./_export":287,"./_fails-is-regexp":288,"./_string-context":358,"./_to-length":369}],490:[function(require,module,exports){
 'use strict';
 // B.2.3.6 String.prototype.fixed()
 require('./_string-html')('fixed', function (createHTML) {
@@ -44102,7 +45422,7 @@ require('./_string-html')('fixed', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],479:[function(require,module,exports){
+},{"./_string-html":359}],491:[function(require,module,exports){
 'use strict';
 // B.2.3.7 String.prototype.fontcolor(color)
 require('./_string-html')('fontcolor', function (createHTML) {
@@ -44111,7 +45431,7 @@ require('./_string-html')('fontcolor', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],480:[function(require,module,exports){
+},{"./_string-html":359}],492:[function(require,module,exports){
 'use strict';
 // B.2.3.8 String.prototype.fontsize(size)
 require('./_string-html')('fontsize', function (createHTML) {
@@ -44120,7 +45440,7 @@ require('./_string-html')('fontsize', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],481:[function(require,module,exports){
+},{"./_string-html":359}],493:[function(require,module,exports){
 var $export = require('./_export');
 var toAbsoluteIndex = require('./_to-absolute-index');
 var fromCharCode = String.fromCharCode;
@@ -44145,7 +45465,7 @@ $export($export.S + $export.F * (!!$fromCodePoint && $fromCodePoint.length != 1)
   }
 });
 
-},{"./_export":275,"./_to-absolute-index":353}],482:[function(require,module,exports){
+},{"./_export":287,"./_to-absolute-index":365}],494:[function(require,module,exports){
 // 21.1.3.7 String.prototype.includes(searchString, position = 0)
 'use strict';
 var $export = require('./_export');
@@ -44159,7 +45479,7 @@ $export($export.P + $export.F * require('./_fails-is-regexp')(INCLUDES), 'String
   }
 });
 
-},{"./_export":275,"./_fails-is-regexp":276,"./_string-context":346}],483:[function(require,module,exports){
+},{"./_export":287,"./_fails-is-regexp":288,"./_string-context":358}],495:[function(require,module,exports){
 'use strict';
 // B.2.3.9 String.prototype.italics()
 require('./_string-html')('italics', function (createHTML) {
@@ -44168,7 +45488,7 @@ require('./_string-html')('italics', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],484:[function(require,module,exports){
+},{"./_string-html":359}],496:[function(require,module,exports){
 'use strict';
 var $at = require('./_string-at')(true);
 
@@ -44187,7 +45507,7 @@ require('./_iter-define')(String, 'String', function (iterated) {
   return { value: point, done: false };
 });
 
-},{"./_iter-define":297,"./_string-at":345}],485:[function(require,module,exports){
+},{"./_iter-define":309,"./_string-at":357}],497:[function(require,module,exports){
 'use strict';
 // B.2.3.10 String.prototype.link(url)
 require('./_string-html')('link', function (createHTML) {
@@ -44196,7 +45516,7 @@ require('./_string-html')('link', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],486:[function(require,module,exports){
+},{"./_string-html":359}],498:[function(require,module,exports){
 var $export = require('./_export');
 var toIObject = require('./_to-iobject');
 var toLength = require('./_to-length');
@@ -44216,7 +45536,7 @@ $export($export.S, 'String', {
   }
 });
 
-},{"./_export":275,"./_to-iobject":356,"./_to-length":357}],487:[function(require,module,exports){
+},{"./_export":287,"./_to-iobject":368,"./_to-length":369}],499:[function(require,module,exports){
 var $export = require('./_export');
 
 $export($export.P, 'String', {
@@ -44224,7 +45544,7 @@ $export($export.P, 'String', {
   repeat: require('./_string-repeat')
 });
 
-},{"./_export":275,"./_string-repeat":349}],488:[function(require,module,exports){
+},{"./_export":287,"./_string-repeat":361}],500:[function(require,module,exports){
 'use strict';
 // B.2.3.11 String.prototype.small()
 require('./_string-html')('small', function (createHTML) {
@@ -44233,7 +45553,7 @@ require('./_string-html')('small', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],489:[function(require,module,exports){
+},{"./_string-html":359}],501:[function(require,module,exports){
 // 21.1.3.18 String.prototype.startsWith(searchString [, position ])
 'use strict';
 var $export = require('./_export');
@@ -44253,7 +45573,7 @@ $export($export.P + $export.F * require('./_fails-is-regexp')(STARTS_WITH), 'Str
   }
 });
 
-},{"./_export":275,"./_fails-is-regexp":276,"./_string-context":346,"./_to-length":357}],490:[function(require,module,exports){
+},{"./_export":287,"./_fails-is-regexp":288,"./_string-context":358,"./_to-length":369}],502:[function(require,module,exports){
 'use strict';
 // B.2.3.12 String.prototype.strike()
 require('./_string-html')('strike', function (createHTML) {
@@ -44262,7 +45582,7 @@ require('./_string-html')('strike', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],491:[function(require,module,exports){
+},{"./_string-html":359}],503:[function(require,module,exports){
 'use strict';
 // B.2.3.13 String.prototype.sub()
 require('./_string-html')('sub', function (createHTML) {
@@ -44271,7 +45591,7 @@ require('./_string-html')('sub', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],492:[function(require,module,exports){
+},{"./_string-html":359}],504:[function(require,module,exports){
 'use strict';
 // B.2.3.14 String.prototype.sup()
 require('./_string-html')('sup', function (createHTML) {
@@ -44280,7 +45600,7 @@ require('./_string-html')('sup', function (createHTML) {
   };
 });
 
-},{"./_string-html":347}],493:[function(require,module,exports){
+},{"./_string-html":359}],505:[function(require,module,exports){
 'use strict';
 // 21.1.3.25 String.prototype.trim()
 require('./_string-trim')('trim', function ($trim) {
@@ -44289,7 +45609,7 @@ require('./_string-trim')('trim', function ($trim) {
   };
 });
 
-},{"./_string-trim":350}],494:[function(require,module,exports){
+},{"./_string-trim":362}],506:[function(require,module,exports){
 'use strict';
 // ECMAScript 6 symbols shim
 var global = require('./_global');
@@ -44525,7 +45845,7 @@ setToStringTag(Math, 'Math', true);
 // 24.3.3 JSON[@@toStringTag]
 setToStringTag(global.JSON, 'JSON', true);
 
-},{"./_an-object":249,"./_descriptors":271,"./_enum-keys":274,"./_export":275,"./_fails":277,"./_global":282,"./_has":283,"./_hide":284,"./_is-array":291,"./_is-object":293,"./_library":301,"./_meta":307,"./_object-create":312,"./_object-dp":313,"./_object-gopd":316,"./_object-gopn":318,"./_object-gopn-ext":317,"./_object-gops":319,"./_object-keys":322,"./_object-pie":323,"./_property-desc":331,"./_redefine":333,"./_set-to-string-tag":340,"./_shared":342,"./_to-iobject":356,"./_to-primitive":359,"./_uid":363,"./_wks":368,"./_wks-define":366,"./_wks-ext":367}],495:[function(require,module,exports){
+},{"./_an-object":261,"./_descriptors":283,"./_enum-keys":286,"./_export":287,"./_fails":289,"./_global":294,"./_has":295,"./_hide":296,"./_is-array":303,"./_is-object":305,"./_library":313,"./_meta":319,"./_object-create":324,"./_object-dp":325,"./_object-gopd":328,"./_object-gopn":330,"./_object-gopn-ext":329,"./_object-gops":331,"./_object-keys":334,"./_object-pie":335,"./_property-desc":343,"./_redefine":345,"./_set-to-string-tag":352,"./_shared":354,"./_to-iobject":368,"./_to-primitive":371,"./_uid":375,"./_wks":380,"./_wks-define":378,"./_wks-ext":379}],507:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var $typed = require('./_typed');
@@ -44573,76 +45893,76 @@ $export($export.P + $export.U + $export.F * require('./_fails')(function () {
 
 require('./_set-species')(ARRAY_BUFFER);
 
-},{"./_an-object":249,"./_export":275,"./_fails":277,"./_global":282,"./_is-object":293,"./_set-species":339,"./_species-constructor":343,"./_to-absolute-index":353,"./_to-length":357,"./_typed":362,"./_typed-buffer":361}],496:[function(require,module,exports){
+},{"./_an-object":261,"./_export":287,"./_fails":289,"./_global":294,"./_is-object":305,"./_set-species":351,"./_species-constructor":355,"./_to-absolute-index":365,"./_to-length":369,"./_typed":374,"./_typed-buffer":373}],508:[function(require,module,exports){
 var $export = require('./_export');
 $export($export.G + $export.W + $export.F * !require('./_typed').ABV, {
   DataView: require('./_typed-buffer').DataView
 });
 
-},{"./_export":275,"./_typed":362,"./_typed-buffer":361}],497:[function(require,module,exports){
+},{"./_export":287,"./_typed":374,"./_typed-buffer":373}],509:[function(require,module,exports){
 require('./_typed-array')('Float32', 4, function (init) {
   return function Float32Array(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 });
 
-},{"./_typed-array":360}],498:[function(require,module,exports){
+},{"./_typed-array":372}],510:[function(require,module,exports){
 require('./_typed-array')('Float64', 8, function (init) {
   return function Float64Array(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 });
 
-},{"./_typed-array":360}],499:[function(require,module,exports){
+},{"./_typed-array":372}],511:[function(require,module,exports){
 require('./_typed-array')('Int16', 2, function (init) {
   return function Int16Array(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 });
 
-},{"./_typed-array":360}],500:[function(require,module,exports){
+},{"./_typed-array":372}],512:[function(require,module,exports){
 require('./_typed-array')('Int32', 4, function (init) {
   return function Int32Array(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 });
 
-},{"./_typed-array":360}],501:[function(require,module,exports){
+},{"./_typed-array":372}],513:[function(require,module,exports){
 require('./_typed-array')('Int8', 1, function (init) {
   return function Int8Array(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 });
 
-},{"./_typed-array":360}],502:[function(require,module,exports){
+},{"./_typed-array":372}],514:[function(require,module,exports){
 require('./_typed-array')('Uint16', 2, function (init) {
   return function Uint16Array(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 });
 
-},{"./_typed-array":360}],503:[function(require,module,exports){
+},{"./_typed-array":372}],515:[function(require,module,exports){
 require('./_typed-array')('Uint32', 4, function (init) {
   return function Uint32Array(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 });
 
-},{"./_typed-array":360}],504:[function(require,module,exports){
+},{"./_typed-array":372}],516:[function(require,module,exports){
 require('./_typed-array')('Uint8', 1, function (init) {
   return function Uint8Array(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 });
 
-},{"./_typed-array":360}],505:[function(require,module,exports){
+},{"./_typed-array":372}],517:[function(require,module,exports){
 require('./_typed-array')('Uint8', 1, function (init) {
   return function Uint8ClampedArray(data, byteOffset, length) {
     return init(this, data, byteOffset, length);
   };
 }, true);
 
-},{"./_typed-array":360}],506:[function(require,module,exports){
+},{"./_typed-array":372}],518:[function(require,module,exports){
 'use strict';
 var each = require('./_array-methods')(0);
 var redefine = require('./_redefine');
@@ -44703,7 +46023,7 @@ if (fails(function () { return new $WeakMap().set((Object.freeze || Object)(tmp)
   });
 }
 
-},{"./_array-methods":254,"./_collection":264,"./_collection-weak":263,"./_fails":277,"./_is-object":293,"./_meta":307,"./_object-assign":311,"./_redefine":333,"./_validate-collection":365}],507:[function(require,module,exports){
+},{"./_array-methods":266,"./_collection":276,"./_collection-weak":275,"./_fails":289,"./_is-object":305,"./_meta":319,"./_object-assign":323,"./_redefine":345,"./_validate-collection":377}],519:[function(require,module,exports){
 'use strict';
 var weak = require('./_collection-weak');
 var validate = require('./_validate-collection');
@@ -44719,7 +46039,7 @@ require('./_collection')(WEAK_SET, function (get) {
   }
 }, weak, false, true);
 
-},{"./_collection":264,"./_collection-weak":263,"./_validate-collection":365}],508:[function(require,module,exports){
+},{"./_collection":276,"./_collection-weak":275,"./_validate-collection":377}],520:[function(require,module,exports){
 'use strict';
 // https://tc39.github.io/proposal-flatMap/#sec-Array.prototype.flatMap
 var $export = require('./_export');
@@ -44743,7 +46063,7 @@ $export($export.P, 'Array', {
 
 require('./_add-to-unscopables')('flatMap');
 
-},{"./_a-function":245,"./_add-to-unscopables":247,"./_array-species-create":257,"./_export":275,"./_flatten-into-array":280,"./_to-length":357,"./_to-object":358}],509:[function(require,module,exports){
+},{"./_a-function":257,"./_add-to-unscopables":259,"./_array-species-create":269,"./_export":287,"./_flatten-into-array":292,"./_to-length":369,"./_to-object":370}],521:[function(require,module,exports){
 'use strict';
 // https://tc39.github.io/proposal-flatMap/#sec-Array.prototype.flatten
 var $export = require('./_export');
@@ -44766,7 +46086,7 @@ $export($export.P, 'Array', {
 
 require('./_add-to-unscopables')('flatten');
 
-},{"./_add-to-unscopables":247,"./_array-species-create":257,"./_export":275,"./_flatten-into-array":280,"./_to-integer":355,"./_to-length":357,"./_to-object":358}],510:[function(require,module,exports){
+},{"./_add-to-unscopables":259,"./_array-species-create":269,"./_export":287,"./_flatten-into-array":292,"./_to-integer":367,"./_to-length":369,"./_to-object":370}],522:[function(require,module,exports){
 'use strict';
 // https://github.com/tc39/Array.prototype.includes
 var $export = require('./_export');
@@ -44780,7 +46100,7 @@ $export($export.P, 'Array', {
 
 require('./_add-to-unscopables')('includes');
 
-},{"./_add-to-unscopables":247,"./_array-includes":253,"./_export":275}],511:[function(require,module,exports){
+},{"./_add-to-unscopables":259,"./_array-includes":265,"./_export":287}],523:[function(require,module,exports){
 // https://github.com/rwaldron/tc39-notes/blob/master/es6/2014-09/sept-25.md#510-globalasap-for-enqueuing-a-microtask
 var $export = require('./_export');
 var microtask = require('./_microtask')();
@@ -44794,7 +46114,7 @@ $export($export.G, {
   }
 });
 
-},{"./_cof":260,"./_export":275,"./_global":282,"./_microtask":309}],512:[function(require,module,exports){
+},{"./_cof":272,"./_export":287,"./_global":294,"./_microtask":321}],524:[function(require,module,exports){
 // https://github.com/ljharb/proposal-is-error
 var $export = require('./_export');
 var cof = require('./_cof');
@@ -44805,27 +46125,27 @@ $export($export.S, 'Error', {
   }
 });
 
-},{"./_cof":260,"./_export":275}],513:[function(require,module,exports){
+},{"./_cof":272,"./_export":287}],525:[function(require,module,exports){
 // https://github.com/tc39/proposal-global
 var $export = require('./_export');
 
 $export($export.G, { global: require('./_global') });
 
-},{"./_export":275,"./_global":282}],514:[function(require,module,exports){
+},{"./_export":287,"./_global":294}],526:[function(require,module,exports){
 // https://tc39.github.io/proposal-setmap-offrom/#sec-map.from
 require('./_set-collection-from')('Map');
 
-},{"./_set-collection-from":336}],515:[function(require,module,exports){
+},{"./_set-collection-from":348}],527:[function(require,module,exports){
 // https://tc39.github.io/proposal-setmap-offrom/#sec-map.of
 require('./_set-collection-of')('Map');
 
-},{"./_set-collection-of":337}],516:[function(require,module,exports){
+},{"./_set-collection-of":349}],528:[function(require,module,exports){
 // https://github.com/DavidBruant/Map-Set.prototype.toJSON
 var $export = require('./_export');
 
 $export($export.P + $export.R, 'Map', { toJSON: require('./_collection-to-json')('Map') });
 
-},{"./_collection-to-json":262,"./_export":275}],517:[function(require,module,exports){
+},{"./_collection-to-json":274,"./_export":287}],529:[function(require,module,exports){
 // https://rwaldron.github.io/proposal-math-extensions/
 var $export = require('./_export');
 
@@ -44835,13 +46155,13 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],518:[function(require,module,exports){
+},{"./_export":287}],530:[function(require,module,exports){
 // https://rwaldron.github.io/proposal-math-extensions/
 var $export = require('./_export');
 
 $export($export.S, 'Math', { DEG_PER_RAD: Math.PI / 180 });
 
-},{"./_export":275}],519:[function(require,module,exports){
+},{"./_export":287}],531:[function(require,module,exports){
 // https://rwaldron.github.io/proposal-math-extensions/
 var $export = require('./_export');
 var RAD_PER_DEG = 180 / Math.PI;
@@ -44852,7 +46172,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],520:[function(require,module,exports){
+},{"./_export":287}],532:[function(require,module,exports){
 // https://rwaldron.github.io/proposal-math-extensions/
 var $export = require('./_export');
 var scale = require('./_math-scale');
@@ -44864,7 +46184,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275,"./_math-fround":303,"./_math-scale":305}],521:[function(require,module,exports){
+},{"./_export":287,"./_math-fround":315,"./_math-scale":317}],533:[function(require,module,exports){
 // https://gist.github.com/BrendanEich/4294d5c212a6d2254703
 var $export = require('./_export');
 
@@ -44877,7 +46197,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],522:[function(require,module,exports){
+},{"./_export":287}],534:[function(require,module,exports){
 // https://gist.github.com/BrendanEich/4294d5c212a6d2254703
 var $export = require('./_export');
 
@@ -44895,7 +46215,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],523:[function(require,module,exports){
+},{"./_export":287}],535:[function(require,module,exports){
 // https://gist.github.com/BrendanEich/4294d5c212a6d2254703
 var $export = require('./_export');
 
@@ -44908,13 +46228,13 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],524:[function(require,module,exports){
+},{"./_export":287}],536:[function(require,module,exports){
 // https://rwaldron.github.io/proposal-math-extensions/
 var $export = require('./_export');
 
 $export($export.S, 'Math', { RAD_PER_DEG: 180 / Math.PI });
 
-},{"./_export":275}],525:[function(require,module,exports){
+},{"./_export":287}],537:[function(require,module,exports){
 // https://rwaldron.github.io/proposal-math-extensions/
 var $export = require('./_export');
 var DEG_PER_RAD = Math.PI / 180;
@@ -44925,13 +46245,13 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],526:[function(require,module,exports){
+},{"./_export":287}],538:[function(require,module,exports){
 // https://rwaldron.github.io/proposal-math-extensions/
 var $export = require('./_export');
 
 $export($export.S, 'Math', { scale: require('./_math-scale') });
 
-},{"./_export":275,"./_math-scale":305}],527:[function(require,module,exports){
+},{"./_export":287,"./_math-scale":317}],539:[function(require,module,exports){
 // http://jfbastien.github.io/papers/Math.signbit.html
 var $export = require('./_export');
 
@@ -44940,7 +46260,7 @@ $export($export.S, 'Math', { signbit: function signbit(x) {
   return (x = +x) != x ? x : x == 0 ? 1 / x == Infinity : x > 0;
 } });
 
-},{"./_export":275}],528:[function(require,module,exports){
+},{"./_export":287}],540:[function(require,module,exports){
 // https://gist.github.com/BrendanEich/4294d5c212a6d2254703
 var $export = require('./_export');
 
@@ -44958,7 +46278,7 @@ $export($export.S, 'Math', {
   }
 });
 
-},{"./_export":275}],529:[function(require,module,exports){
+},{"./_export":287}],541:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var toObject = require('./_to-object');
@@ -44972,7 +46292,7 @@ require('./_descriptors') && $export($export.P + require('./_object-forced-pam')
   }
 });
 
-},{"./_a-function":245,"./_descriptors":271,"./_export":275,"./_object-dp":313,"./_object-forced-pam":315,"./_to-object":358}],530:[function(require,module,exports){
+},{"./_a-function":257,"./_descriptors":283,"./_export":287,"./_object-dp":325,"./_object-forced-pam":327,"./_to-object":370}],542:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var toObject = require('./_to-object');
@@ -44986,7 +46306,7 @@ require('./_descriptors') && $export($export.P + require('./_object-forced-pam')
   }
 });
 
-},{"./_a-function":245,"./_descriptors":271,"./_export":275,"./_object-dp":313,"./_object-forced-pam":315,"./_to-object":358}],531:[function(require,module,exports){
+},{"./_a-function":257,"./_descriptors":283,"./_export":287,"./_object-dp":325,"./_object-forced-pam":327,"./_to-object":370}],543:[function(require,module,exports){
 // https://github.com/tc39/proposal-object-values-entries
 var $export = require('./_export');
 var $entries = require('./_object-to-array')(true);
@@ -44997,7 +46317,7 @@ $export($export.S, 'Object', {
   }
 });
 
-},{"./_export":275,"./_object-to-array":325}],532:[function(require,module,exports){
+},{"./_export":287,"./_object-to-array":337}],544:[function(require,module,exports){
 // https://github.com/tc39/proposal-object-getownpropertydescriptors
 var $export = require('./_export');
 var ownKeys = require('./_own-keys');
@@ -45021,7 +46341,7 @@ $export($export.S, 'Object', {
   }
 });
 
-},{"./_create-property":266,"./_export":275,"./_object-gopd":316,"./_own-keys":326,"./_to-iobject":356}],533:[function(require,module,exports){
+},{"./_create-property":278,"./_export":287,"./_object-gopd":328,"./_own-keys":338,"./_to-iobject":368}],545:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var toObject = require('./_to-object');
@@ -45041,7 +46361,7 @@ require('./_descriptors') && $export($export.P + require('./_object-forced-pam')
   }
 });
 
-},{"./_descriptors":271,"./_export":275,"./_object-forced-pam":315,"./_object-gopd":316,"./_object-gpo":320,"./_to-object":358,"./_to-primitive":359}],534:[function(require,module,exports){
+},{"./_descriptors":283,"./_export":287,"./_object-forced-pam":327,"./_object-gopd":328,"./_object-gpo":332,"./_to-object":370,"./_to-primitive":371}],546:[function(require,module,exports){
 'use strict';
 var $export = require('./_export');
 var toObject = require('./_to-object');
@@ -45061,7 +46381,7 @@ require('./_descriptors') && $export($export.P + require('./_object-forced-pam')
   }
 });
 
-},{"./_descriptors":271,"./_export":275,"./_object-forced-pam":315,"./_object-gopd":316,"./_object-gpo":320,"./_to-object":358,"./_to-primitive":359}],535:[function(require,module,exports){
+},{"./_descriptors":283,"./_export":287,"./_object-forced-pam":327,"./_object-gopd":328,"./_object-gpo":332,"./_to-object":370,"./_to-primitive":371}],547:[function(require,module,exports){
 // https://github.com/tc39/proposal-object-values-entries
 var $export = require('./_export');
 var $values = require('./_object-to-array')(false);
@@ -45072,7 +46392,7 @@ $export($export.S, 'Object', {
   }
 });
 
-},{"./_export":275,"./_object-to-array":325}],536:[function(require,module,exports){
+},{"./_export":287,"./_object-to-array":337}],548:[function(require,module,exports){
 'use strict';
 // https://github.com/zenparsing/es-observable
 var $export = require('./_export');
@@ -45273,7 +46593,7 @@ $export($export.G, { Observable: $Observable });
 
 require('./_set-species')('Observable');
 
-},{"./_a-function":245,"./_an-instance":248,"./_an-object":249,"./_core":265,"./_export":275,"./_for-of":281,"./_global":282,"./_hide":284,"./_microtask":309,"./_redefine-all":332,"./_set-species":339,"./_wks":368}],537:[function(require,module,exports){
+},{"./_a-function":257,"./_an-instance":260,"./_an-object":261,"./_core":277,"./_export":287,"./_for-of":293,"./_global":294,"./_hide":296,"./_microtask":321,"./_redefine-all":344,"./_set-species":351,"./_wks":380}],549:[function(require,module,exports){
 // https://github.com/tc39/proposal-promise-finally
 'use strict';
 var $export = require('./_export');
@@ -45295,7 +46615,7 @@ $export($export.P + $export.R, 'Promise', { 'finally': function (onFinally) {
   );
 } });
 
-},{"./_core":265,"./_export":275,"./_global":282,"./_promise-resolve":330,"./_species-constructor":343}],538:[function(require,module,exports){
+},{"./_core":277,"./_export":287,"./_global":294,"./_promise-resolve":342,"./_species-constructor":355}],550:[function(require,module,exports){
 'use strict';
 // https://github.com/tc39/proposal-promise-try
 var $export = require('./_export');
@@ -45309,7 +46629,7 @@ $export($export.S, 'Promise', { 'try': function (callbackfn) {
   return promiseCapability.promise;
 } });
 
-},{"./_export":275,"./_new-promise-capability":310,"./_perform":329}],539:[function(require,module,exports){
+},{"./_export":287,"./_new-promise-capability":322,"./_perform":341}],551:[function(require,module,exports){
 var metadata = require('./_metadata');
 var anObject = require('./_an-object');
 var toMetaKey = metadata.key;
@@ -45319,7 +46639,7 @@ metadata.exp({ defineMetadata: function defineMetadata(metadataKey, metadataValu
   ordinaryDefineOwnMetadata(metadataKey, metadataValue, anObject(target), toMetaKey(targetKey));
 } });
 
-},{"./_an-object":249,"./_metadata":308}],540:[function(require,module,exports){
+},{"./_an-object":261,"./_metadata":320}],552:[function(require,module,exports){
 var metadata = require('./_metadata');
 var anObject = require('./_an-object');
 var toMetaKey = metadata.key;
@@ -45336,7 +46656,7 @@ metadata.exp({ deleteMetadata: function deleteMetadata(metadataKey, target /* , 
   return !!targetMetadata.size || store['delete'](target);
 } });
 
-},{"./_an-object":249,"./_metadata":308}],541:[function(require,module,exports){
+},{"./_an-object":261,"./_metadata":320}],553:[function(require,module,exports){
 var Set = require('./es6.set');
 var from = require('./_array-from-iterable');
 var metadata = require('./_metadata');
@@ -45357,7 +46677,7 @@ metadata.exp({ getMetadataKeys: function getMetadataKeys(target /* , targetKey *
   return ordinaryMetadataKeys(anObject(target), arguments.length < 2 ? undefined : toMetaKey(arguments[1]));
 } });
 
-},{"./_an-object":249,"./_array-from-iterable":252,"./_metadata":308,"./_object-gpo":320,"./es6.set":471}],542:[function(require,module,exports){
+},{"./_an-object":261,"./_array-from-iterable":264,"./_metadata":320,"./_object-gpo":332,"./es6.set":483}],554:[function(require,module,exports){
 var metadata = require('./_metadata');
 var anObject = require('./_an-object');
 var getPrototypeOf = require('./_object-gpo');
@@ -45376,7 +46696,7 @@ metadata.exp({ getMetadata: function getMetadata(metadataKey, target /* , target
   return ordinaryGetMetadata(metadataKey, anObject(target), arguments.length < 3 ? undefined : toMetaKey(arguments[2]));
 } });
 
-},{"./_an-object":249,"./_metadata":308,"./_object-gpo":320}],543:[function(require,module,exports){
+},{"./_an-object":261,"./_metadata":320,"./_object-gpo":332}],555:[function(require,module,exports){
 var metadata = require('./_metadata');
 var anObject = require('./_an-object');
 var ordinaryOwnMetadataKeys = metadata.keys;
@@ -45386,7 +46706,7 @@ metadata.exp({ getOwnMetadataKeys: function getOwnMetadataKeys(target /* , targe
   return ordinaryOwnMetadataKeys(anObject(target), arguments.length < 2 ? undefined : toMetaKey(arguments[1]));
 } });
 
-},{"./_an-object":249,"./_metadata":308}],544:[function(require,module,exports){
+},{"./_an-object":261,"./_metadata":320}],556:[function(require,module,exports){
 var metadata = require('./_metadata');
 var anObject = require('./_an-object');
 var ordinaryGetOwnMetadata = metadata.get;
@@ -45397,7 +46717,7 @@ metadata.exp({ getOwnMetadata: function getOwnMetadata(metadataKey, target /* , 
     , arguments.length < 3 ? undefined : toMetaKey(arguments[2]));
 } });
 
-},{"./_an-object":249,"./_metadata":308}],545:[function(require,module,exports){
+},{"./_an-object":261,"./_metadata":320}],557:[function(require,module,exports){
 var metadata = require('./_metadata');
 var anObject = require('./_an-object');
 var getPrototypeOf = require('./_object-gpo');
@@ -45415,7 +46735,7 @@ metadata.exp({ hasMetadata: function hasMetadata(metadataKey, target /* , target
   return ordinaryHasMetadata(metadataKey, anObject(target), arguments.length < 3 ? undefined : toMetaKey(arguments[2]));
 } });
 
-},{"./_an-object":249,"./_metadata":308,"./_object-gpo":320}],546:[function(require,module,exports){
+},{"./_an-object":261,"./_metadata":320,"./_object-gpo":332}],558:[function(require,module,exports){
 var metadata = require('./_metadata');
 var anObject = require('./_an-object');
 var ordinaryHasOwnMetadata = metadata.has;
@@ -45426,7 +46746,7 @@ metadata.exp({ hasOwnMetadata: function hasOwnMetadata(metadataKey, target /* , 
     , arguments.length < 3 ? undefined : toMetaKey(arguments[2]));
 } });
 
-},{"./_an-object":249,"./_metadata":308}],547:[function(require,module,exports){
+},{"./_an-object":261,"./_metadata":320}],559:[function(require,module,exports){
 var $metadata = require('./_metadata');
 var anObject = require('./_an-object');
 var aFunction = require('./_a-function');
@@ -45443,21 +46763,21 @@ $metadata.exp({ metadata: function metadata(metadataKey, metadataValue) {
   };
 } });
 
-},{"./_a-function":245,"./_an-object":249,"./_metadata":308}],548:[function(require,module,exports){
+},{"./_a-function":257,"./_an-object":261,"./_metadata":320}],560:[function(require,module,exports){
 // https://tc39.github.io/proposal-setmap-offrom/#sec-set.from
 require('./_set-collection-from')('Set');
 
-},{"./_set-collection-from":336}],549:[function(require,module,exports){
+},{"./_set-collection-from":348}],561:[function(require,module,exports){
 // https://tc39.github.io/proposal-setmap-offrom/#sec-set.of
 require('./_set-collection-of')('Set');
 
-},{"./_set-collection-of":337}],550:[function(require,module,exports){
+},{"./_set-collection-of":349}],562:[function(require,module,exports){
 // https://github.com/DavidBruant/Map-Set.prototype.toJSON
 var $export = require('./_export');
 
 $export($export.P + $export.R, 'Set', { toJSON: require('./_collection-to-json')('Set') });
 
-},{"./_collection-to-json":262,"./_export":275}],551:[function(require,module,exports){
+},{"./_collection-to-json":274,"./_export":287}],563:[function(require,module,exports){
 'use strict';
 // https://github.com/mathiasbynens/String.prototype.at
 var $export = require('./_export');
@@ -45469,7 +46789,7 @@ $export($export.P, 'String', {
   }
 });
 
-},{"./_export":275,"./_string-at":345}],552:[function(require,module,exports){
+},{"./_export":287,"./_string-at":357}],564:[function(require,module,exports){
 'use strict';
 // https://tc39.github.io/String.prototype.matchAll/
 var $export = require('./_export');
@@ -45501,7 +46821,7 @@ $export($export.P, 'String', {
   }
 });
 
-},{"./_defined":270,"./_export":275,"./_flags":279,"./_is-regexp":294,"./_iter-create":296,"./_to-length":357}],553:[function(require,module,exports){
+},{"./_defined":282,"./_export":287,"./_flags":291,"./_is-regexp":306,"./_iter-create":308,"./_to-length":369}],565:[function(require,module,exports){
 'use strict';
 // https://github.com/tc39/proposal-string-pad-start-end
 var $export = require('./_export');
@@ -45515,7 +46835,7 @@ $export($export.P + $export.F * /Version\/10\.\d+(\.\d+)? Safari\//.test(userAge
   }
 });
 
-},{"./_export":275,"./_string-pad":348,"./_user-agent":364}],554:[function(require,module,exports){
+},{"./_export":287,"./_string-pad":360,"./_user-agent":376}],566:[function(require,module,exports){
 'use strict';
 // https://github.com/tc39/proposal-string-pad-start-end
 var $export = require('./_export');
@@ -45529,7 +46849,7 @@ $export($export.P + $export.F * /Version\/10\.\d+(\.\d+)? Safari\//.test(userAge
   }
 });
 
-},{"./_export":275,"./_string-pad":348,"./_user-agent":364}],555:[function(require,module,exports){
+},{"./_export":287,"./_string-pad":360,"./_user-agent":376}],567:[function(require,module,exports){
 'use strict';
 // https://github.com/sebmarkbage/ecmascript-string-left-right-trim
 require('./_string-trim')('trimLeft', function ($trim) {
@@ -45538,7 +46858,7 @@ require('./_string-trim')('trimLeft', function ($trim) {
   };
 }, 'trimStart');
 
-},{"./_string-trim":350}],556:[function(require,module,exports){
+},{"./_string-trim":362}],568:[function(require,module,exports){
 'use strict';
 // https://github.com/sebmarkbage/ecmascript-string-left-right-trim
 require('./_string-trim')('trimRight', function ($trim) {
@@ -45547,35 +46867,35 @@ require('./_string-trim')('trimRight', function ($trim) {
   };
 }, 'trimEnd');
 
-},{"./_string-trim":350}],557:[function(require,module,exports){
+},{"./_string-trim":362}],569:[function(require,module,exports){
 require('./_wks-define')('asyncIterator');
 
-},{"./_wks-define":366}],558:[function(require,module,exports){
+},{"./_wks-define":378}],570:[function(require,module,exports){
 require('./_wks-define')('observable');
 
-},{"./_wks-define":366}],559:[function(require,module,exports){
+},{"./_wks-define":378}],571:[function(require,module,exports){
 // https://github.com/tc39/proposal-global
 var $export = require('./_export');
 
 $export($export.S, 'System', { global: require('./_global') });
 
-},{"./_export":275,"./_global":282}],560:[function(require,module,exports){
+},{"./_export":287,"./_global":294}],572:[function(require,module,exports){
 // https://tc39.github.io/proposal-setmap-offrom/#sec-weakmap.from
 require('./_set-collection-from')('WeakMap');
 
-},{"./_set-collection-from":336}],561:[function(require,module,exports){
+},{"./_set-collection-from":348}],573:[function(require,module,exports){
 // https://tc39.github.io/proposal-setmap-offrom/#sec-weakmap.of
 require('./_set-collection-of')('WeakMap');
 
-},{"./_set-collection-of":337}],562:[function(require,module,exports){
+},{"./_set-collection-of":349}],574:[function(require,module,exports){
 // https://tc39.github.io/proposal-setmap-offrom/#sec-weakset.from
 require('./_set-collection-from')('WeakSet');
 
-},{"./_set-collection-from":336}],563:[function(require,module,exports){
+},{"./_set-collection-from":348}],575:[function(require,module,exports){
 // https://tc39.github.io/proposal-setmap-offrom/#sec-weakset.of
 require('./_set-collection-of')('WeakSet');
 
-},{"./_set-collection-of":337}],564:[function(require,module,exports){
+},{"./_set-collection-of":349}],576:[function(require,module,exports){
 var $iterators = require('./es6.array.iterator');
 var getKeys = require('./_object-keys');
 var redefine = require('./_redefine');
@@ -45635,7 +46955,7 @@ for (var collections = getKeys(DOMIterables), i = 0; i < collections.length; i++
   }
 }
 
-},{"./_global":282,"./_hide":284,"./_iterators":300,"./_object-keys":322,"./_redefine":333,"./_wks":368,"./es6.array.iterator":381}],565:[function(require,module,exports){
+},{"./_global":294,"./_hide":296,"./_iterators":312,"./_object-keys":334,"./_redefine":345,"./_wks":380,"./es6.array.iterator":393}],577:[function(require,module,exports){
 var $export = require('./_export');
 var $task = require('./_task');
 $export($export.G + $export.B, {
@@ -45643,7 +46963,7 @@ $export($export.G + $export.B, {
   clearImmediate: $task.clear
 });
 
-},{"./_export":275,"./_task":352}],566:[function(require,module,exports){
+},{"./_export":287,"./_task":364}],578:[function(require,module,exports){
 // ie9- setTimeout & setInterval additional parameters fix
 var global = require('./_global');
 var $export = require('./_export');
@@ -45665,7 +46985,7 @@ $export($export.G + $export.B + $export.F * MSIE, {
   setInterval: wrap(global.setInterval)
 });
 
-},{"./_export":275,"./_global":282,"./_user-agent":364}],567:[function(require,module,exports){
+},{"./_export":287,"./_global":294,"./_user-agent":376}],579:[function(require,module,exports){
 require('./modules/es6.symbol');
 require('./modules/es6.object.create');
 require('./modules/es6.object.define-property');
@@ -45864,7 +47184,7 @@ require('./modules/web.immediate');
 require('./modules/web.dom.iterable');
 module.exports = require('./modules/_core');
 
-},{"./modules/_core":265,"./modules/es6.array.copy-within":371,"./modules/es6.array.every":372,"./modules/es6.array.fill":373,"./modules/es6.array.filter":374,"./modules/es6.array.find":376,"./modules/es6.array.find-index":375,"./modules/es6.array.for-each":377,"./modules/es6.array.from":378,"./modules/es6.array.index-of":379,"./modules/es6.array.is-array":380,"./modules/es6.array.iterator":381,"./modules/es6.array.join":382,"./modules/es6.array.last-index-of":383,"./modules/es6.array.map":384,"./modules/es6.array.of":385,"./modules/es6.array.reduce":387,"./modules/es6.array.reduce-right":386,"./modules/es6.array.slice":388,"./modules/es6.array.some":389,"./modules/es6.array.sort":390,"./modules/es6.array.species":391,"./modules/es6.date.now":392,"./modules/es6.date.to-iso-string":393,"./modules/es6.date.to-json":394,"./modules/es6.date.to-primitive":395,"./modules/es6.date.to-string":396,"./modules/es6.function.bind":397,"./modules/es6.function.has-instance":398,"./modules/es6.function.name":399,"./modules/es6.map":400,"./modules/es6.math.acosh":401,"./modules/es6.math.asinh":402,"./modules/es6.math.atanh":403,"./modules/es6.math.cbrt":404,"./modules/es6.math.clz32":405,"./modules/es6.math.cosh":406,"./modules/es6.math.expm1":407,"./modules/es6.math.fround":408,"./modules/es6.math.hypot":409,"./modules/es6.math.imul":410,"./modules/es6.math.log10":411,"./modules/es6.math.log1p":412,"./modules/es6.math.log2":413,"./modules/es6.math.sign":414,"./modules/es6.math.sinh":415,"./modules/es6.math.tanh":416,"./modules/es6.math.trunc":417,"./modules/es6.number.constructor":418,"./modules/es6.number.epsilon":419,"./modules/es6.number.is-finite":420,"./modules/es6.number.is-integer":421,"./modules/es6.number.is-nan":422,"./modules/es6.number.is-safe-integer":423,"./modules/es6.number.max-safe-integer":424,"./modules/es6.number.min-safe-integer":425,"./modules/es6.number.parse-float":426,"./modules/es6.number.parse-int":427,"./modules/es6.number.to-fixed":428,"./modules/es6.number.to-precision":429,"./modules/es6.object.assign":430,"./modules/es6.object.create":431,"./modules/es6.object.define-properties":432,"./modules/es6.object.define-property":433,"./modules/es6.object.freeze":434,"./modules/es6.object.get-own-property-descriptor":435,"./modules/es6.object.get-own-property-names":436,"./modules/es6.object.get-prototype-of":437,"./modules/es6.object.is":441,"./modules/es6.object.is-extensible":438,"./modules/es6.object.is-frozen":439,"./modules/es6.object.is-sealed":440,"./modules/es6.object.keys":442,"./modules/es6.object.prevent-extensions":443,"./modules/es6.object.seal":444,"./modules/es6.object.set-prototype-of":445,"./modules/es6.object.to-string":446,"./modules/es6.parse-float":447,"./modules/es6.parse-int":448,"./modules/es6.promise":449,"./modules/es6.reflect.apply":450,"./modules/es6.reflect.construct":451,"./modules/es6.reflect.define-property":452,"./modules/es6.reflect.delete-property":453,"./modules/es6.reflect.enumerate":454,"./modules/es6.reflect.get":457,"./modules/es6.reflect.get-own-property-descriptor":455,"./modules/es6.reflect.get-prototype-of":456,"./modules/es6.reflect.has":458,"./modules/es6.reflect.is-extensible":459,"./modules/es6.reflect.own-keys":460,"./modules/es6.reflect.prevent-extensions":461,"./modules/es6.reflect.set":463,"./modules/es6.reflect.set-prototype-of":462,"./modules/es6.regexp.constructor":464,"./modules/es6.regexp.flags":465,"./modules/es6.regexp.match":466,"./modules/es6.regexp.replace":467,"./modules/es6.regexp.search":468,"./modules/es6.regexp.split":469,"./modules/es6.regexp.to-string":470,"./modules/es6.set":471,"./modules/es6.string.anchor":472,"./modules/es6.string.big":473,"./modules/es6.string.blink":474,"./modules/es6.string.bold":475,"./modules/es6.string.code-point-at":476,"./modules/es6.string.ends-with":477,"./modules/es6.string.fixed":478,"./modules/es6.string.fontcolor":479,"./modules/es6.string.fontsize":480,"./modules/es6.string.from-code-point":481,"./modules/es6.string.includes":482,"./modules/es6.string.italics":483,"./modules/es6.string.iterator":484,"./modules/es6.string.link":485,"./modules/es6.string.raw":486,"./modules/es6.string.repeat":487,"./modules/es6.string.small":488,"./modules/es6.string.starts-with":489,"./modules/es6.string.strike":490,"./modules/es6.string.sub":491,"./modules/es6.string.sup":492,"./modules/es6.string.trim":493,"./modules/es6.symbol":494,"./modules/es6.typed.array-buffer":495,"./modules/es6.typed.data-view":496,"./modules/es6.typed.float32-array":497,"./modules/es6.typed.float64-array":498,"./modules/es6.typed.int16-array":499,"./modules/es6.typed.int32-array":500,"./modules/es6.typed.int8-array":501,"./modules/es6.typed.uint16-array":502,"./modules/es6.typed.uint32-array":503,"./modules/es6.typed.uint8-array":504,"./modules/es6.typed.uint8-clamped-array":505,"./modules/es6.weak-map":506,"./modules/es6.weak-set":507,"./modules/es7.array.flat-map":508,"./modules/es7.array.flatten":509,"./modules/es7.array.includes":510,"./modules/es7.asap":511,"./modules/es7.error.is-error":512,"./modules/es7.global":513,"./modules/es7.map.from":514,"./modules/es7.map.of":515,"./modules/es7.map.to-json":516,"./modules/es7.math.clamp":517,"./modules/es7.math.deg-per-rad":518,"./modules/es7.math.degrees":519,"./modules/es7.math.fscale":520,"./modules/es7.math.iaddh":521,"./modules/es7.math.imulh":522,"./modules/es7.math.isubh":523,"./modules/es7.math.rad-per-deg":524,"./modules/es7.math.radians":525,"./modules/es7.math.scale":526,"./modules/es7.math.signbit":527,"./modules/es7.math.umulh":528,"./modules/es7.object.define-getter":529,"./modules/es7.object.define-setter":530,"./modules/es7.object.entries":531,"./modules/es7.object.get-own-property-descriptors":532,"./modules/es7.object.lookup-getter":533,"./modules/es7.object.lookup-setter":534,"./modules/es7.object.values":535,"./modules/es7.observable":536,"./modules/es7.promise.finally":537,"./modules/es7.promise.try":538,"./modules/es7.reflect.define-metadata":539,"./modules/es7.reflect.delete-metadata":540,"./modules/es7.reflect.get-metadata":542,"./modules/es7.reflect.get-metadata-keys":541,"./modules/es7.reflect.get-own-metadata":544,"./modules/es7.reflect.get-own-metadata-keys":543,"./modules/es7.reflect.has-metadata":545,"./modules/es7.reflect.has-own-metadata":546,"./modules/es7.reflect.metadata":547,"./modules/es7.set.from":548,"./modules/es7.set.of":549,"./modules/es7.set.to-json":550,"./modules/es7.string.at":551,"./modules/es7.string.match-all":552,"./modules/es7.string.pad-end":553,"./modules/es7.string.pad-start":554,"./modules/es7.string.trim-left":555,"./modules/es7.string.trim-right":556,"./modules/es7.symbol.async-iterator":557,"./modules/es7.symbol.observable":558,"./modules/es7.system.global":559,"./modules/es7.weak-map.from":560,"./modules/es7.weak-map.of":561,"./modules/es7.weak-set.from":562,"./modules/es7.weak-set.of":563,"./modules/web.dom.iterable":564,"./modules/web.immediate":565,"./modules/web.timers":566}],568:[function(require,module,exports){
+},{"./modules/_core":277,"./modules/es6.array.copy-within":383,"./modules/es6.array.every":384,"./modules/es6.array.fill":385,"./modules/es6.array.filter":386,"./modules/es6.array.find":388,"./modules/es6.array.find-index":387,"./modules/es6.array.for-each":389,"./modules/es6.array.from":390,"./modules/es6.array.index-of":391,"./modules/es6.array.is-array":392,"./modules/es6.array.iterator":393,"./modules/es6.array.join":394,"./modules/es6.array.last-index-of":395,"./modules/es6.array.map":396,"./modules/es6.array.of":397,"./modules/es6.array.reduce":399,"./modules/es6.array.reduce-right":398,"./modules/es6.array.slice":400,"./modules/es6.array.some":401,"./modules/es6.array.sort":402,"./modules/es6.array.species":403,"./modules/es6.date.now":404,"./modules/es6.date.to-iso-string":405,"./modules/es6.date.to-json":406,"./modules/es6.date.to-primitive":407,"./modules/es6.date.to-string":408,"./modules/es6.function.bind":409,"./modules/es6.function.has-instance":410,"./modules/es6.function.name":411,"./modules/es6.map":412,"./modules/es6.math.acosh":413,"./modules/es6.math.asinh":414,"./modules/es6.math.atanh":415,"./modules/es6.math.cbrt":416,"./modules/es6.math.clz32":417,"./modules/es6.math.cosh":418,"./modules/es6.math.expm1":419,"./modules/es6.math.fround":420,"./modules/es6.math.hypot":421,"./modules/es6.math.imul":422,"./modules/es6.math.log10":423,"./modules/es6.math.log1p":424,"./modules/es6.math.log2":425,"./modules/es6.math.sign":426,"./modules/es6.math.sinh":427,"./modules/es6.math.tanh":428,"./modules/es6.math.trunc":429,"./modules/es6.number.constructor":430,"./modules/es6.number.epsilon":431,"./modules/es6.number.is-finite":432,"./modules/es6.number.is-integer":433,"./modules/es6.number.is-nan":434,"./modules/es6.number.is-safe-integer":435,"./modules/es6.number.max-safe-integer":436,"./modules/es6.number.min-safe-integer":437,"./modules/es6.number.parse-float":438,"./modules/es6.number.parse-int":439,"./modules/es6.number.to-fixed":440,"./modules/es6.number.to-precision":441,"./modules/es6.object.assign":442,"./modules/es6.object.create":443,"./modules/es6.object.define-properties":444,"./modules/es6.object.define-property":445,"./modules/es6.object.freeze":446,"./modules/es6.object.get-own-property-descriptor":447,"./modules/es6.object.get-own-property-names":448,"./modules/es6.object.get-prototype-of":449,"./modules/es6.object.is":453,"./modules/es6.object.is-extensible":450,"./modules/es6.object.is-frozen":451,"./modules/es6.object.is-sealed":452,"./modules/es6.object.keys":454,"./modules/es6.object.prevent-extensions":455,"./modules/es6.object.seal":456,"./modules/es6.object.set-prototype-of":457,"./modules/es6.object.to-string":458,"./modules/es6.parse-float":459,"./modules/es6.parse-int":460,"./modules/es6.promise":461,"./modules/es6.reflect.apply":462,"./modules/es6.reflect.construct":463,"./modules/es6.reflect.define-property":464,"./modules/es6.reflect.delete-property":465,"./modules/es6.reflect.enumerate":466,"./modules/es6.reflect.get":469,"./modules/es6.reflect.get-own-property-descriptor":467,"./modules/es6.reflect.get-prototype-of":468,"./modules/es6.reflect.has":470,"./modules/es6.reflect.is-extensible":471,"./modules/es6.reflect.own-keys":472,"./modules/es6.reflect.prevent-extensions":473,"./modules/es6.reflect.set":475,"./modules/es6.reflect.set-prototype-of":474,"./modules/es6.regexp.constructor":476,"./modules/es6.regexp.flags":477,"./modules/es6.regexp.match":478,"./modules/es6.regexp.replace":479,"./modules/es6.regexp.search":480,"./modules/es6.regexp.split":481,"./modules/es6.regexp.to-string":482,"./modules/es6.set":483,"./modules/es6.string.anchor":484,"./modules/es6.string.big":485,"./modules/es6.string.blink":486,"./modules/es6.string.bold":487,"./modules/es6.string.code-point-at":488,"./modules/es6.string.ends-with":489,"./modules/es6.string.fixed":490,"./modules/es6.string.fontcolor":491,"./modules/es6.string.fontsize":492,"./modules/es6.string.from-code-point":493,"./modules/es6.string.includes":494,"./modules/es6.string.italics":495,"./modules/es6.string.iterator":496,"./modules/es6.string.link":497,"./modules/es6.string.raw":498,"./modules/es6.string.repeat":499,"./modules/es6.string.small":500,"./modules/es6.string.starts-with":501,"./modules/es6.string.strike":502,"./modules/es6.string.sub":503,"./modules/es6.string.sup":504,"./modules/es6.string.trim":505,"./modules/es6.symbol":506,"./modules/es6.typed.array-buffer":507,"./modules/es6.typed.data-view":508,"./modules/es6.typed.float32-array":509,"./modules/es6.typed.float64-array":510,"./modules/es6.typed.int16-array":511,"./modules/es6.typed.int32-array":512,"./modules/es6.typed.int8-array":513,"./modules/es6.typed.uint16-array":514,"./modules/es6.typed.uint32-array":515,"./modules/es6.typed.uint8-array":516,"./modules/es6.typed.uint8-clamped-array":517,"./modules/es6.weak-map":518,"./modules/es6.weak-set":519,"./modules/es7.array.flat-map":520,"./modules/es7.array.flatten":521,"./modules/es7.array.includes":522,"./modules/es7.asap":523,"./modules/es7.error.is-error":524,"./modules/es7.global":525,"./modules/es7.map.from":526,"./modules/es7.map.of":527,"./modules/es7.map.to-json":528,"./modules/es7.math.clamp":529,"./modules/es7.math.deg-per-rad":530,"./modules/es7.math.degrees":531,"./modules/es7.math.fscale":532,"./modules/es7.math.iaddh":533,"./modules/es7.math.imulh":534,"./modules/es7.math.isubh":535,"./modules/es7.math.rad-per-deg":536,"./modules/es7.math.radians":537,"./modules/es7.math.scale":538,"./modules/es7.math.signbit":539,"./modules/es7.math.umulh":540,"./modules/es7.object.define-getter":541,"./modules/es7.object.define-setter":542,"./modules/es7.object.entries":543,"./modules/es7.object.get-own-property-descriptors":544,"./modules/es7.object.lookup-getter":545,"./modules/es7.object.lookup-setter":546,"./modules/es7.object.values":547,"./modules/es7.observable":548,"./modules/es7.promise.finally":549,"./modules/es7.promise.try":550,"./modules/es7.reflect.define-metadata":551,"./modules/es7.reflect.delete-metadata":552,"./modules/es7.reflect.get-metadata":554,"./modules/es7.reflect.get-metadata-keys":553,"./modules/es7.reflect.get-own-metadata":556,"./modules/es7.reflect.get-own-metadata-keys":555,"./modules/es7.reflect.has-metadata":557,"./modules/es7.reflect.has-own-metadata":558,"./modules/es7.reflect.metadata":559,"./modules/es7.set.from":560,"./modules/es7.set.of":561,"./modules/es7.set.to-json":562,"./modules/es7.string.at":563,"./modules/es7.string.match-all":564,"./modules/es7.string.pad-end":565,"./modules/es7.string.pad-start":566,"./modules/es7.string.trim-left":567,"./modules/es7.string.trim-right":568,"./modules/es7.symbol.async-iterator":569,"./modules/es7.symbol.observable":570,"./modules/es7.system.global":571,"./modules/es7.weak-map.from":572,"./modules/es7.weak-map.of":573,"./modules/es7.weak-set.from":574,"./modules/es7.weak-set.of":575,"./modules/web.dom.iterable":576,"./modules/web.immediate":577,"./modules/web.timers":578}],580:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = (nBytes * 8) - mLen - 1
@@ -45950,7 +47270,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],569:[function(require,module,exports){
+},{}],581:[function(require,module,exports){
 /*
 object-assign
 (c) Sindre Sorhus
@@ -46042,7 +47362,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 	return to;
 };
 
-},{}],570:[function(require,module,exports){
+},{}],582:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -46228,7 +47548,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],571:[function(require,module,exports){
+},{}],583:[function(require,module,exports){
 (function (process){
 /**
  * Copyright (c) 2013-present, Facebook, Inc.
@@ -46323,7 +47643,7 @@ function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
 module.exports = checkPropTypes;
 
 }).call(this,require('_process'))
-},{"./lib/ReactPropTypesSecret":572,"_process":570}],572:[function(require,module,exports){
+},{"./lib/ReactPropTypesSecret":584,"_process":582}],584:[function(require,module,exports){
 /**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
@@ -46337,13 +47657,13 @@ var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
 
 module.exports = ReactPropTypesSecret;
 
-},{}],573:[function(require,module,exports){
+},{}],585:[function(require,module,exports){
 // minimal library entry point.
 
 "use strict";
 module.exports = require("./src/index-minimal");
 
-},{"./src/index-minimal":574}],574:[function(require,module,exports){
+},{"./src/index-minimal":586}],586:[function(require,module,exports){
 "use strict";
 var protobuf = exports;
 
@@ -46381,7 +47701,7 @@ function configure() {
 protobuf.Writer._configure(protobuf.BufferWriter);
 configure();
 
-},{"./reader":575,"./reader_buffer":576,"./roots":577,"./rpc":578,"./util/minimal":581,"./writer":582,"./writer_buffer":583}],575:[function(require,module,exports){
+},{"./reader":587,"./reader_buffer":588,"./roots":589,"./rpc":590,"./util/minimal":593,"./writer":594,"./writer_buffer":595}],587:[function(require,module,exports){
 "use strict";
 module.exports = Reader;
 
@@ -46788,7 +48108,7 @@ Reader._configure = function(BufferReader_) {
     });
 };
 
-},{"./util/minimal":581}],576:[function(require,module,exports){
+},{"./util/minimal":593}],588:[function(require,module,exports){
 "use strict";
 module.exports = BufferReader;
 
@@ -46834,7 +48154,7 @@ BufferReader.prototype.string = function read_string_buffer() {
  * @returns {Buffer} Value read
  */
 
-},{"./reader":575,"./util/minimal":581}],577:[function(require,module,exports){
+},{"./reader":587,"./util/minimal":593}],589:[function(require,module,exports){
 "use strict";
 module.exports = {};
 
@@ -46854,7 +48174,7 @@ module.exports = {};
  * var root = protobuf.roots["myroot"];
  */
 
-},{}],578:[function(require,module,exports){
+},{}],590:[function(require,module,exports){
 "use strict";
 
 /**
@@ -46892,7 +48212,7 @@ var rpc = exports;
 
 rpc.Service = require("./rpc/service");
 
-},{"./rpc/service":579}],579:[function(require,module,exports){
+},{"./rpc/service":591}],591:[function(require,module,exports){
 "use strict";
 module.exports = Service;
 
@@ -47036,7 +48356,7 @@ Service.prototype.end = function end(endedByRPC) {
     return this;
 };
 
-},{"../util/minimal":581}],580:[function(require,module,exports){
+},{"../util/minimal":593}],592:[function(require,module,exports){
 "use strict";
 module.exports = LongBits;
 
@@ -47238,7 +48558,7 @@ LongBits.prototype.length = function length() {
          : part2 < 128 ? 9 : 10;
 };
 
-},{"../util/minimal":581}],581:[function(require,module,exports){
+},{"../util/minimal":593}],593:[function(require,module,exports){
 (function (global){
 "use strict";
 var util = exports;
@@ -47656,7 +48976,7 @@ util._configure = function() {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./longbits":580,"@protobufjs/aspromise":1,"@protobufjs/base64":2,"@protobufjs/eventemitter":3,"@protobufjs/float":4,"@protobufjs/inquire":5,"@protobufjs/pool":6,"@protobufjs/utf8":7}],582:[function(require,module,exports){
+},{"./longbits":592,"@protobufjs/aspromise":1,"@protobufjs/base64":2,"@protobufjs/eventemitter":3,"@protobufjs/float":4,"@protobufjs/inquire":5,"@protobufjs/pool":6,"@protobufjs/utf8":7}],594:[function(require,module,exports){
 "use strict";
 module.exports = Writer;
 
@@ -48117,7 +49437,7 @@ Writer._configure = function(BufferWriter_) {
     BufferWriter = BufferWriter_;
 };
 
-},{"./util/minimal":581}],583:[function(require,module,exports){
+},{"./util/minimal":593}],595:[function(require,module,exports){
 "use strict";
 module.exports = BufferWriter;
 
@@ -48200,9 +49520,9 @@ BufferWriter.prototype.string = function write_string_buffer(value) {
  * @returns {Buffer} Finished buffer
  */
 
-},{"./util/minimal":581,"./writer":582}],584:[function(require,module,exports){
+},{"./util/minimal":593,"./writer":594}],596:[function(require,module,exports){
 (function (process){
-/** @license React v16.5.1
+/** @license React v16.5.2
  * react-dom.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -48223,7 +49543,7 @@ var React = require('react');
 var _assign = require('object-assign');
 var checkPropTypes = require('prop-types/checkPropTypes');
 var schedule = require('schedule');
-var tracking = require('schedule/tracking');
+var tracing = require('schedule/tracing');
 
 /**
  * Use invariant() to assert state which your program assumes to be true.
@@ -51382,8 +52702,8 @@ var warnAboutLegacyContextAPI = false;
 // Gather advanced timing metrics for Profiler subtrees.
 var enableProfilerTimer = true;
 
-// Track which interactions trigger each commit.
-var enableSchedulerTracking = true;
+// Trace which interactions trigger each commit.
+var enableSchedulerTracing = true;
 
 // Only used in www builds.
 
@@ -53498,7 +54818,7 @@ function getModernOffsetsFromPoints(outerNode, anchorNode, anchorOffset, focusNo
  */
 function setOffsets(node, offsets) {
   var doc = node.ownerDocument || document;
-  var win = doc ? doc.defaultView : window;
+  var win = doc && doc.defaultView || window;
   var selection = win.getSelection();
   var length = node.textContent.length;
   var start = Math.min(offsets.start, length);
@@ -54182,6 +55502,7 @@ function initWrapperState$2(element, props) {
 function updateWrapper$1(element, props) {
   var node = element;
   var value = getToStringValue(props.value);
+  var defaultValue = getToStringValue(props.defaultValue);
   if (value != null) {
     // Cast `value` to a string to ensure the value is set correctly. While
     // browsers typically do this as necessary, jsdom doesn't.
@@ -54190,12 +55511,12 @@ function updateWrapper$1(element, props) {
     if (newValue !== node.value) {
       node.value = newValue;
     }
-    if (props.defaultValue == null) {
+    if (props.defaultValue == null && node.defaultValue !== newValue) {
       node.defaultValue = newValue;
     }
   }
-  if (props.defaultValue != null) {
-    node.defaultValue = toString(getToStringValue(props.defaultValue));
+  if (defaultValue != null) {
+    node.defaultValue = toString(defaultValue);
   }
 }
 
@@ -58280,17 +59601,17 @@ function assignFiberPropertiesInDEV(target, source) {
 // TODO: This should be lifted into the renderer.
 
 
-// The following attributes are only used by interaction tracking builds.
+// The following attributes are only used by interaction tracing builds.
 // They enable interactions to be associated with their async work,
 // And expose interaction metadata to the React DevTools Profiler plugin.
-// Note that these attributes are only defined when the enableSchedulerTracking flag is enabled.
+// Note that these attributes are only defined when the enableSchedulerTracing flag is enabled.
 
 
 // Exported FiberRoot type includes all properties,
 // To avoid requiring potentially error-prone :any casts throughout the project.
-// Profiling properties are only safe to access in profiling builds (when enableSchedulerTracking is true).
+// Profiling properties are only safe to access in profiling builds (when enableSchedulerTracing is true).
 // The types are defined separately within this file to ensure they stay in sync.
-// (We don't have to use an inline :any cast when enableSchedulerTracking is disabled.)
+// (We don't have to use an inline :any cast when enableSchedulerTracing is disabled.)
 
 /* eslint-enable no-use-before-define */
 
@@ -58300,7 +59621,7 @@ function createFiberRoot(containerInfo, isAsync, hydrate) {
   var uninitializedFiber = createHostRootFiber(isAsync);
 
   var root = void 0;
-  if (enableSchedulerTracking) {
+  if (enableSchedulerTracing) {
     root = {
       current: uninitializedFiber,
       containerInfo: containerInfo,
@@ -58325,7 +59646,7 @@ function createFiberRoot(containerInfo, isAsync, hydrate) {
       firstBatch: null,
       nextScheduledRoot: null,
 
-      interactionThreadID: tracking.unstable_getThreadID(),
+      interactionThreadID: tracing.unstable_getThreadID(),
       memoizedInteractions: new Set(),
       pendingInteractionMap: new Map()
     };
@@ -58359,8 +59680,8 @@ function createFiberRoot(containerInfo, isAsync, hydrate) {
   uninitializedFiber.stateNode = root;
 
   // The reason for the way the Flow types are structured in this file,
-  // Is to avoid needing :any casts everywhere interaction tracking fields are used.
-  // Unfortunately that requires an :any cast for non-interaction tracking capable builds.
+  // Is to avoid needing :any casts everywhere interaction tracing fields are used.
+  // Unfortunately that requires an :any cast for non-interaction tracing capable builds.
   // $FlowFixMe Remove this :any cast and replace it with something better.
   return root;
 }
@@ -62956,7 +64277,7 @@ function commitLifeCycles(finishedRoot, current$$1, finishedWork, committedExpir
         if (enableProfilerTimer) {
           var onRender = finishedWork.memoizedProps.onRender;
 
-          if (enableSchedulerTracking) {
+          if (enableSchedulerTracing) {
             onRender(finishedWork.memoizedProps.id, current$$1 === null ? 'mount' : 'update', finishedWork.actualDuration, finishedWork.treeBaseDuration, finishedWork.actualStartTime, getCommitTime(), finishedRoot.memoizedInteractions);
           } else {
             onRender(finishedWork.memoizedProps.id, current$$1 === null ? 'mount' : 'update', finishedWork.actualDuration, finishedWork.treeBaseDuration, finishedWork.actualStartTime, getCommitTime());
@@ -63812,10 +65133,10 @@ var didWarnSetStateChildContext = void 0;
 var warnAboutUpdateOnUnmounted = void 0;
 var warnAboutInvalidUpdates = void 0;
 
-if (enableSchedulerTracking) {
+if (enableSchedulerTracing) {
   // Provide explicit error message when production+profiling bundle of e.g. react-dom
-  // is used with production (non-profiling) bundle of schedule/tracking
-  !(tracking.__interactionsRef != null && tracking.__interactionsRef.current != null) ? invariant(false, 'It is not supported to run the profiling version of a renderer (for example, `react-dom/profiling`) without also replacing the `schedule/tracking` module with `schedule/tracking-profiling`. Your bundler might have a setting for aliasing both modules. Learn more at http://fb.me/react-profiling') : void 0;
+  // is used with production (non-profiling) bundle of schedule/tracing
+  !(tracing.__interactionsRef != null && tracing.__interactionsRef.current != null) ? invariant(false, 'It is not supported to run the profiling version of a renderer (for example, `react-dom/profiling`) without also replacing the `schedule/tracing` module with `schedule/tracing-profiling`. Your bundler might have a setting for aliasing both modules. Learn more at http://fb.me/react-profiling') : void 0;
 }
 
 {
@@ -64156,12 +65477,12 @@ function commitRoot(root, finishedWork) {
   markCommittedPriorityLevels(root, earliestRemainingTimeBeforeCommit);
 
   var prevInteractions = null;
-  var committedInteractions = enableSchedulerTracking ? [] : null;
-  if (enableSchedulerTracking) {
+  var committedInteractions = enableSchedulerTracing ? [] : null;
+  if (enableSchedulerTracing) {
     // Restore any pending interactions at this point,
     // So that cascading work triggered during the render phase will be accounted for.
-    prevInteractions = tracking.__interactionsRef.current;
-    tracking.__interactionsRef.current = root.memoizedInteractions;
+    prevInteractions = tracing.__interactionsRef.current;
+    tracing.__interactionsRef.current = root.memoizedInteractions;
 
     // We are potentially finished with the current batch of interactions.
     // So we should clear them out of the pending interaction map.
@@ -64309,13 +65630,13 @@ function commitRoot(root, finishedWork) {
   }
   onCommit(root, earliestRemainingTimeAfterCommit);
 
-  if (enableSchedulerTracking) {
-    tracking.__interactionsRef.current = prevInteractions;
+  if (enableSchedulerTracing) {
+    tracing.__interactionsRef.current = prevInteractions;
 
     var subscriber = void 0;
 
     try {
-      subscriber = tracking.__subscriberRef.current;
+      subscriber = tracing.__subscriberRef.current;
       if (subscriber !== null && root.memoizedInteractions.size > 0) {
         var threadID = computeThreadID(committedExpirationTime, root.interactionThreadID);
         subscriber.onWorkStopped(root.memoizedInteractions, threadID);
@@ -64672,11 +65993,11 @@ function renderRoot(root, isYieldy, isExpired) {
   var expirationTime = root.nextExpirationTimeToWorkOn;
 
   var prevInteractions = null;
-  if (enableSchedulerTracking) {
-    // We're about to start new tracked work.
+  if (enableSchedulerTracing) {
+    // We're about to start new traced work.
     // Restore pending interactions so cascading work triggered during the render phase will be accounted for.
-    prevInteractions = tracking.__interactionsRef.current;
-    tracking.__interactionsRef.current = root.memoizedInteractions;
+    prevInteractions = tracing.__interactionsRef.current;
+    tracing.__interactionsRef.current = root.memoizedInteractions;
   }
 
   // Check if we're starting from a fresh stack, or if we're resuming from
@@ -64689,7 +66010,7 @@ function renderRoot(root, isYieldy, isExpired) {
     nextUnitOfWork = createWorkInProgress(nextRoot.current, null, nextRenderExpirationTime);
     root.pendingCommitExpirationTime = NoWork;
 
-    if (enableSchedulerTracking) {
+    if (enableSchedulerTracing) {
       // Determine which interactions this batch of work currently includes,
       // So that we can accurately attribute time spent working on it,
       var interactions = new Set();
@@ -64708,13 +66029,13 @@ function renderRoot(root, isYieldy, isExpired) {
       root.memoizedInteractions = interactions;
 
       if (interactions.size > 0) {
-        var subscriber = tracking.__subscriberRef.current;
+        var subscriber = tracing.__subscriberRef.current;
         if (subscriber !== null) {
           var threadID = computeThreadID(expirationTime, root.interactionThreadID);
           try {
             subscriber.onWorkStarted(interactions, threadID);
           } catch (error) {
-            // Work thrown by an interaction tracking subscriber should be rethrown,
+            // Work thrown by an interaction tracing subscriber should be rethrown,
             // But only once it's safe (to avoid leaveing the scheduler in an invalid state).
             // Store the error for now and we'll re-throw in finishRendering().
             if (!hasUnhandledError) {
@@ -64777,9 +66098,9 @@ function renderRoot(root, isYieldy, isExpired) {
     break;
   } while (true);
 
-  if (enableSchedulerTracking) {
-    // Tracked work is done for now; restore the previous interactions.
-    tracking.__interactionsRef.current = prevInteractions;
+  if (enableSchedulerTracing) {
+    // Traced work is done for now; restore the previous interactions.
+    tracing.__interactionsRef.current = prevInteractions;
   }
 
   // We're done performing work. Time to clean up.
@@ -65030,15 +66351,15 @@ function retrySuspendedRoot(root, fiber, suspendedTime) {
     scheduleWorkToRoot(fiber, retryTime);
     var rootExpirationTime = root.expirationTime;
     if (rootExpirationTime !== NoWork) {
-      if (enableSchedulerTracking) {
+      if (enableSchedulerTracing) {
         // Restore previous interactions so that new work is associated with them.
-        var prevInteractions = tracking.__interactionsRef.current;
-        tracking.__interactionsRef.current = root.memoizedInteractions;
+        var prevInteractions = tracing.__interactionsRef.current;
+        tracing.__interactionsRef.current = root.memoizedInteractions;
         // Because suspense timeouts do not decrement the interaction count,
         // Continued suspense work should also not increment the count.
         storeInteractionsForExpirationTime(root, rootExpirationTime, false);
         requestWork(root, rootExpirationTime);
-        tracking.__interactionsRef.current = prevInteractions;
+        tracing.__interactionsRef.current = prevInteractions;
       } else {
         requestWork(root, rootExpirationTime);
       }
@@ -65079,11 +66400,11 @@ function scheduleWorkToRoot(fiber, expirationTime) {
 }
 
 function storeInteractionsForExpirationTime(root, expirationTime, updateInteractionCounts) {
-  if (!enableSchedulerTracking) {
+  if (!enableSchedulerTracing) {
     return;
   }
 
-  var interactions = tracking.__interactionsRef.current;
+  var interactions = tracing.__interactionsRef.current;
   if (interactions.size > 0) {
     var pendingInteractions = root.pendingInteractionMap.get(expirationTime);
     if (pendingInteractions != null) {
@@ -65106,7 +66427,7 @@ function storeInteractionsForExpirationTime(root, expirationTime, updateInteract
       }
     }
 
-    var subscriber = tracking.__subscriberRef.current;
+    var subscriber = tracing.__subscriberRef.current;
     if (subscriber !== null) {
       var threadID = computeThreadID(expirationTime, root.interactionThreadID);
       subscriber.onWorkScheduled(interactions, threadID);
@@ -65132,7 +66453,7 @@ function scheduleWork(fiber, expirationTime) {
     return;
   }
 
-  if (enableSchedulerTracking) {
+  if (enableSchedulerTracing) {
     storeInteractionsForExpirationTime(root, expirationTime, true);
   }
 
@@ -65273,7 +66594,7 @@ function onTimeout(root, finishedWork, suspendedExpirationTime) {
     recomputeCurrentRendererTime();
     currentSchedulerTime = currentRendererTime;
 
-    if (enableSchedulerTracking) {
+    if (enableSchedulerTracing) {
       // Don't update pending interaction counts for suspense timeouts,
       // Because we know we still need to do more work in this case.
       suspenseDidTimeout = true;
@@ -65779,7 +67100,7 @@ function flushControlled(fn) {
   } finally {
     isBatchingUpdates = previousIsBatchingUpdates;
     if (!isBatchingUpdates && !isRendering) {
-      performWork(Sync, null);
+      performSyncWork();
     }
   }
 }
@@ -65956,7 +67277,7 @@ implementation) {
 
 // TODO: this is special because it gets imported during build.
 
-var ReactVersion = '16.5.1';
+var ReactVersion = '16.5.2';
 
 // TODO: This type is shared between the reconciler and ReactDOM, but will
 // eventually be lifted out to the renderer.
@@ -66462,8 +67783,8 @@ module.exports = reactDom;
 }
 
 }).call(this,require('_process'))
-},{"_process":570,"object-assign":569,"prop-types/checkPropTypes":571,"react":589,"schedule":594,"schedule/tracking":595}],585:[function(require,module,exports){
-/** @license React v16.5.1
+},{"_process":582,"object-assign":581,"prop-types/checkPropTypes":583,"react":601,"schedule":606,"schedule/tracing":607}],597:[function(require,module,exports){
+/** @license React v16.5.2
  * react-dom.production.min.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -66558,7 +67879,7 @@ var be={eventTypes:Wd,extractEvents:function(a,b,c,d){var e=d.window===d?d.docum
 case "keydown":case "keyup":return ae(c,d)}return null}};Ea.injectEventPluginOrder("ResponderEventPlugin SimpleEventPlugin EnterLeaveEventPlugin ChangeEventPlugin SelectEventPlugin BeforeInputEventPlugin".split(" "));ua=Na;va=La;wa=Ma;Ea.injectEventPluginsByName({SimpleEventPlugin:Cd,EnterLeaveEventPlugin:fd,ChangeEventPlugin:Uc,SelectEventPlugin:be,BeforeInputEventPlugin:Eb});function ce(a){var b="";aa.Children.forEach(a,function(a){null!=a&&(b+=a)});return b}
 function de(a,b){a=n({children:void 0},b);if(b=ce(b.children))a.children=b;return a}function ee(a,b,c,d){a=a.options;if(b){b={};for(var e=0;e<c.length;e++)b["$"+c[e]]=!0;for(c=0;c<a.length;c++)e=b.hasOwnProperty("$"+a[c].value),a[c].selected!==e&&(a[c].selected=e),e&&d&&(a[c].defaultSelected=!0)}else{c=""+yc(c);b=null;for(e=0;e<a.length;e++){if(a[e].value===c){a[e].selected=!0;d&&(a[e].defaultSelected=!0);return}null!==b||a[e].disabled||(b=a[e])}null!==b&&(b.selected=!0)}}
 function fe(a,b){null!=b.dangerouslySetInnerHTML?t("91"):void 0;return n({},b,{value:void 0,defaultValue:void 0,children:""+a._wrapperState.initialValue})}function ge(a,b){var c=b.value;null==c&&(c=b.defaultValue,b=b.children,null!=b&&(null!=c?t("92"):void 0,Array.isArray(b)&&(1>=b.length?void 0:t("93"),b=b[0]),c=b),null==c&&(c=""));a._wrapperState={initialValue:yc(c)}}
-function he(a,b){var c=yc(b.value);null!=c&&(c=""+c,c!==a.value&&(a.value=c),null==b.defaultValue&&(a.defaultValue=c));null!=b.defaultValue&&(a.defaultValue=""+yc(b.defaultValue))}function ie(a){var b=a.textContent;b===a._wrapperState.initialValue&&(a.value=b)}var je={html:"http://www.w3.org/1999/xhtml",mathml:"http://www.w3.org/1998/Math/MathML",svg:"http://www.w3.org/2000/svg"};
+function he(a,b){var c=yc(b.value),d=yc(b.defaultValue);null!=c&&(c=""+c,c!==a.value&&(a.value=c),null==b.defaultValue&&a.defaultValue!==c&&(a.defaultValue=c));null!=d&&(a.defaultValue=""+d)}function ie(a){var b=a.textContent;b===a._wrapperState.initialValue&&(a.value=b)}var je={html:"http://www.w3.org/1999/xhtml",mathml:"http://www.w3.org/1998/Math/MathML",svg:"http://www.w3.org/2000/svg"};
 function ke(a){switch(a){case "svg":return"http://www.w3.org/2000/svg";case "math":return"http://www.w3.org/1998/Math/MathML";default:return"http://www.w3.org/1999/xhtml"}}function le(a,b){return null==a||"http://www.w3.org/1999/xhtml"===a?ke(b):"http://www.w3.org/2000/svg"===a&&"foreignObject"===b?"http://www.w3.org/1999/xhtml":a}
 var me=void 0,ne=function(a){return"undefined"!==typeof MSApp&&MSApp.execUnsafeLocalFunction?function(b,c,d,e){MSApp.execUnsafeLocalFunction(function(){return a(b,c,d,e)})}:a}(function(a,b){if(a.namespaceURI!==je.svg||"innerHTML"in a)a.innerHTML=b;else{me=me||document.createElement("div");me.innerHTML="<svg>"+b+"</svg>";for(b=me.firstChild;a.firstChild;)a.removeChild(a.firstChild);for(;b.firstChild;)a.appendChild(b.firstChild)}});
 function oe(a,b){if(b){var c=a.firstChild;if(c&&c===a.lastChild&&3===c.nodeType){c.nodeValue=b;return}}a.textContent=b}
@@ -66674,11 +67995,11 @@ function rh(a,b,c){var d=a.firstBatch;if(null!==d&&d._expirationTime<=c&&(null==
 e)break b;P===f&&++A===h&&(m=l);P===k&&++S===g&&(r=l);if(null!==(v=B.nextSibling))break;B=P;P=B.parentNode}B=v}f=-1===m||-1===r?null:{start:m,end:r}}else f=null}f=f||{start:0,end:0}}else f=null;ye={focusedElem:e,selectionRange:f};Gd=!1;for(Q=d;null!==Q;){e=!1;f=void 0;try{for(;null!==Q;){if(Q.effectTag&256){var p=Q.alternate;a:switch(h=Q,h.tag){case 2:case 3:if(h.effectTag&256&&null!==p){var u=p.memoizedProps,x=p.memoizedState,R=h.stateNode;R.props=h.memoizedProps;R.state=h.memoizedState;var yh=R.getSnapshotBeforeUpdate(u,
 x);R.__reactInternalSnapshotBeforeUpdate=yh}break a;case 5:case 7:case 8:case 6:break a;default:t("163")}}Q=Q.nextEffect}}catch(Xa){e=!0,f=Xa}e&&(null===Q?t("178"):void 0,wg(Q,f),null!==Q&&(Q=Q.nextEffect))}for(Q=d;null!==Q;){p=!1;u=void 0;try{for(;null!==Q;){var w=Q.effectTag;w&16&&oe(Q.stateNode,"");if(w&128){var y=Q.alternate;if(null!==y){var q=y.ref;null!==q&&("function"===typeof q?q(null):q.current=null)}}switch(w&14){case 2:Ag(Q);Q.effectTag&=-3;break;case 6:Ag(Q);Q.effectTag&=-3;Bg(Q.alternate,
 Q);break;case 4:Bg(Q.alternate,Q);break;case 8:x=Q,yg(x),x.return=null,x.child=null,x.alternate&&(x.alternate.child=null,x.alternate.return=null)}Q=Q.nextEffect}}catch(Xa){p=!0,u=Xa}p&&(null===Q?t("178"):void 0,wg(Q,u),null!==Q&&(Q=Q.nextEffect))}q=ye;y=Td();w=q.focusedElem;u=q.selectionRange;if(y!==w&&w&&w.ownerDocument&&Sd(w.ownerDocument.documentElement,w)){null!==u&&Ud(w)&&(y=u.start,q=u.end,void 0===q&&(q=y),"selectionStart"in w?(w.selectionStart=y,w.selectionEnd=Math.min(q,w.value.length)):
-(p=w.ownerDocument||document,y=(p?p.defaultView:window).getSelection(),x=w.textContent.length,q=Math.min(u.start,x),u=void 0===u.end?q:Math.min(u.end,x),!y.extend&&q>u&&(x=u,u=q,q=x),x=Rd(w,q),R=Rd(w,u),x&&R&&(1!==y.rangeCount||y.anchorNode!==x.node||y.anchorOffset!==x.offset||y.focusNode!==R.node||y.focusOffset!==R.offset)&&(p=p.createRange(),p.setStart(x.node,x.offset),y.removeAllRanges(),q>u?(y.addRange(p),y.extend(R.node,R.offset)):(p.setEnd(R.node,R.offset),y.addRange(p)))));y=[];for(q=w;q=q.parentNode;)1===
-q.nodeType&&y.push({element:q,left:q.scrollLeft,top:q.scrollTop});"function"===typeof w.focus&&w.focus();for(w=0;w<y.length;w++)q=y[w],q.element.scrollLeft=q.left,q.element.scrollTop=q.top}ye=null;Gd=!!xe;xe=null;a.current=b;for(Q=d;null!==Q;){d=!1;w=void 0;try{for(y=c;null!==Q;){var Sa=Q.effectTag;if(Sa&36){var oc=Q.alternate;q=Q;p=y;switch(q.tag){case 2:case 3:var X=q.stateNode;if(q.effectTag&4)if(null===oc)X.props=q.memoizedProps,X.state=q.memoizedState,X.componentDidMount();else{var Ih=oc.memoizedProps,
-Jh=oc.memoizedState;X.props=q.memoizedProps;X.state=q.memoizedState;X.componentDidUpdate(Ih,Jh,X.__reactInternalSnapshotBeforeUpdate)}var kg=q.updateQueue;null!==kg&&(X.props=q.memoizedProps,X.state=q.memoizedState,lf(q,kg,X,p));break;case 5:var lg=q.updateQueue;if(null!==lg){u=null;if(null!==q.child)switch(q.child.tag){case 7:u=q.child.stateNode;break;case 2:case 3:u=q.child.stateNode}lf(q,lg,u,p)}break;case 7:var Kh=q.stateNode;null===oc&&q.effectTag&4&&ze(q.type,q.memoizedProps)&&Kh.focus();break;
-case 8:break;case 6:break;case 15:break;case 16:break;default:t("163")}}if(Sa&128){var Ac=Q.ref;if(null!==Ac){var mg=Q.stateNode;switch(Q.tag){case 7:var Pd=mg;break;default:Pd=mg}"function"===typeof Ac?Ac(Pd):Ac.current=Pd}}var Lh=Q.nextEffect;Q.nextEffect=null;Q=Lh}}catch(Xa){d=!0,w=Xa}d&&(null===Q?t("178"):void 0,wg(Q,w),null!==Q&&(Q=Q.nextEffect))}Lg=Og=!1;"function"===typeof Oe&&Oe(b.stateNode);Sa=b.expirationTime;b=b.childExpirationTime;b=0===Sa||0!==b&&b<Sa?b:Sa;0===b&&(Fg=null);a.expirationTime=
-b;a.finishedWork=null}function Tg(){return eh?!0:null===hh||hh.timeRemaining()>nh?!1:eh=!0}function Dg(a){null===Y?t("246"):void 0;Y.expirationTime=0;fh||(fh=!0,gh=a)}function sh(a,b){var c=W;W=!0;try{return a(b)}finally{(W=c)||V||Yg(1,null)}}function th(a,b){if(W&&!Wg){Wg=!0;try{return a(b)}finally{Wg=!1}}return a(b)}function uh(a,b,c){if(Ug)return a(b,c);W||V||0===Vg||(Yg(Vg,null),Vg=0);var d=Ug,e=W;W=Ug=!0;try{return a(b,c)}finally{Ug=d,(W=e)||V||Yg(1,null)}}
+(p=w.ownerDocument||document,y=(p&&p.defaultView||window).getSelection(),x=w.textContent.length,q=Math.min(u.start,x),u=void 0===u.end?q:Math.min(u.end,x),!y.extend&&q>u&&(x=u,u=q,q=x),x=Rd(w,q),R=Rd(w,u),x&&R&&(1!==y.rangeCount||y.anchorNode!==x.node||y.anchorOffset!==x.offset||y.focusNode!==R.node||y.focusOffset!==R.offset)&&(p=p.createRange(),p.setStart(x.node,x.offset),y.removeAllRanges(),q>u?(y.addRange(p),y.extend(R.node,R.offset)):(p.setEnd(R.node,R.offset),y.addRange(p)))));y=[];for(q=w;q=
+q.parentNode;)1===q.nodeType&&y.push({element:q,left:q.scrollLeft,top:q.scrollTop});"function"===typeof w.focus&&w.focus();for(w=0;w<y.length;w++)q=y[w],q.element.scrollLeft=q.left,q.element.scrollTop=q.top}ye=null;Gd=!!xe;xe=null;a.current=b;for(Q=d;null!==Q;){d=!1;w=void 0;try{for(y=c;null!==Q;){var Sa=Q.effectTag;if(Sa&36){var oc=Q.alternate;q=Q;p=y;switch(q.tag){case 2:case 3:var X=q.stateNode;if(q.effectTag&4)if(null===oc)X.props=q.memoizedProps,X.state=q.memoizedState,X.componentDidMount();
+else{var Ih=oc.memoizedProps,Jh=oc.memoizedState;X.props=q.memoizedProps;X.state=q.memoizedState;X.componentDidUpdate(Ih,Jh,X.__reactInternalSnapshotBeforeUpdate)}var kg=q.updateQueue;null!==kg&&(X.props=q.memoizedProps,X.state=q.memoizedState,lf(q,kg,X,p));break;case 5:var lg=q.updateQueue;if(null!==lg){u=null;if(null!==q.child)switch(q.child.tag){case 7:u=q.child.stateNode;break;case 2:case 3:u=q.child.stateNode}lf(q,lg,u,p)}break;case 7:var Kh=q.stateNode;null===oc&&q.effectTag&4&&ze(q.type,q.memoizedProps)&&
+Kh.focus();break;case 8:break;case 6:break;case 15:break;case 16:break;default:t("163")}}if(Sa&128){var Ac=Q.ref;if(null!==Ac){var mg=Q.stateNode;switch(Q.tag){case 7:var Pd=mg;break;default:Pd=mg}"function"===typeof Ac?Ac(Pd):Ac.current=Pd}}var Lh=Q.nextEffect;Q.nextEffect=null;Q=Lh}}catch(Xa){d=!0,w=Xa}d&&(null===Q?t("178"):void 0,wg(Q,w),null!==Q&&(Q=Q.nextEffect))}Lg=Og=!1;"function"===typeof Oe&&Oe(b.stateNode);Sa=b.expirationTime;b=b.childExpirationTime;b=0===Sa||0!==b&&b<Sa?b:Sa;0===b&&(Fg=
+null);a.expirationTime=b;a.finishedWork=null}function Tg(){return eh?!0:null===hh||hh.timeRemaining()>nh?!1:eh=!0}function Dg(a){null===Y?t("246"):void 0;Y.expirationTime=0;fh||(fh=!0,gh=a)}function sh(a,b){var c=W;W=!0;try{return a(b)}finally{(W=c)||V||Yg(1,null)}}function th(a,b){if(W&&!Wg){Wg=!0;try{return a(b)}finally{Wg=!1}}return a(b)}function uh(a,b,c){if(Ug)return a(b,c);W||V||0===Vg||(Yg(Vg,null),Vg=0);var d=Ug,e=W;W=Ug=!0;try{return a(b,c)}finally{Ug=d,(W=e)||V||Yg(1,null)}}
 function vh(a){if(!a)return Fe;a=a._reactInternalFiber;a:{2!==jd(a)||2!==a.tag&&3!==a.tag?t("170"):void 0;var b=a;do{switch(b.tag){case 5:b=b.stateNode.context;break a;case 2:if(K(b.type)){b=b.stateNode.__reactInternalMemoizedMergedChildContext;break a}break;case 3:if(K(b.type._reactResult)){b=b.stateNode.__reactInternalMemoizedMergedChildContext;break a}}b=b.return}while(null!==b);t("171");b=void 0}if(2===a.tag){var c=a.type;if(K(c))return Le(a,c,b)}else if(3===a.tag&&(c=a.type._reactResult,K(c)))return Le(a,
 c,b);return b}function wh(a,b,c,d,e){var f=b.current;c=vh(c);null===b.context?b.context=c:b.pendingContext=c;b=e;e=df(d);e.payload={element:a};b=void 0===b?null:b;null!==b&&(e.callback=b);ff(f,e);If(f,d);return d}function xh(a,b,c,d){var e=b.current,f=Gf();e=Hf(f,e);return wh(a,b,c,e,d)}function zh(a){a=a.current;if(!a.child)return null;switch(a.child.tag){case 7:return a.child.stateNode;default:return a.child.stateNode}}
 function Ah(a,b,c){var d=3<arguments.length&&void 0!==arguments[3]?arguments[3]:null;return{$$typeof:ac,key:null==d?null:""+d,children:a,containerInfo:b,implementation:c}}
@@ -66696,10 +68017,10 @@ function Gh(a,b,c,d,e){Eh(c)?void 0:t("200");var f=c._reactRootContainer;if(f){i
 function Hh(a,b){var c=2<arguments.length&&void 0!==arguments[2]?arguments[2]:null;Eh(b)?void 0:t("200");return Ah(a,b,null,c)}
 var Mh={createPortal:Hh,findDOMNode:function(a){if(null==a)return null;if(1===a.nodeType)return a;var b=a._reactInternalFiber;void 0===b&&("function"===typeof a.render?t("188"):t("268",Object.keys(a)));a=md(b);a=null===a?null:a.stateNode;return a},hydrate:function(a,b,c){return Gh(null,a,b,!0,c)},render:function(a,b,c){return Gh(null,a,b,!1,c)},unstable_renderSubtreeIntoContainer:function(a,b,c,d){null==a||void 0===a._reactInternalFiber?t("38"):void 0;return Gh(a,b,c,!1,d)},unmountComponentAtNode:function(a){Eh(a)?
 void 0:t("40");return a._reactRootContainer?(th(function(){Gh(null,null,a,!1,function(){a._reactRootContainer=null})}),!0):!1},unstable_createPortal:function(){return Hh.apply(void 0,arguments)},unstable_batchedUpdates:sh,unstable_interactiveUpdates:uh,flushSync:function(a,b){V?t("187"):void 0;var c=W;W=!0;try{return bh(a,b)}finally{W=c,Yg(1,null)}},unstable_flushControlled:function(a){var b=W;W=!0;try{bh(a)}finally{(W=b)||V||Yg(1,null)}},__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{Events:[La,
-Ma,Na,Ea.injectEventPluginsByName,qa,Ua,function(a){za(a,Ta)},Jb,Kb,Id,Ga]},unstable_createRoot:function(a,b){Eh(a)?void 0:t("278");return new Dh(a,!0,null!=b&&!0===b.hydrate)}};(function(a){var b=a.findFiberByHostInstance;return Re(n({},a,{findHostInstanceByFiber:function(a){a=md(a);return null===a?null:a.stateNode},findFiberByHostInstance:function(a){return b?b(a):null}}))})({findFiberByHostInstance:Ka,bundleType:0,version:"16.5.1",rendererPackageName:"react-dom"});
+Ma,Na,Ea.injectEventPluginsByName,qa,Ua,function(a){za(a,Ta)},Jb,Kb,Id,Ga]},unstable_createRoot:function(a,b){Eh(a)?void 0:t("278");return new Dh(a,!0,null!=b&&!0===b.hydrate)}};(function(a){var b=a.findFiberByHostInstance;return Re(n({},a,{findHostInstanceByFiber:function(a){a=md(a);return null===a?null:a.stateNode},findFiberByHostInstance:function(a){return b?b(a):null}}))})({findFiberByHostInstance:Ka,bundleType:0,version:"16.5.2",rendererPackageName:"react-dom"});
 var Nh={default:Mh},Oh=Nh&&Mh||Nh;module.exports=Oh.default||Oh;
 
-},{"object-assign":569,"react":589,"schedule":594}],586:[function(require,module,exports){
+},{"object-assign":581,"react":601,"schedule":606}],598:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -66741,9 +68062,9 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/react-dom.development.js":584,"./cjs/react-dom.production.min.js":585,"_process":570}],587:[function(require,module,exports){
+},{"./cjs/react-dom.development.js":596,"./cjs/react-dom.production.min.js":597,"_process":582}],599:[function(require,module,exports){
 (function (process){
-/** @license React v16.5.1
+/** @license React v16.5.2
  * react.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -66765,7 +68086,7 @@ var checkPropTypes = require('prop-types/checkPropTypes');
 
 // TODO: this is special because it gets imported during build.
 
-var ReactVersion = '16.5.1';
+var ReactVersion = '16.5.2';
 
 // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
 // nor polyfill, then a plain number is used for performance.
@@ -66826,7 +68147,7 @@ var enableSuspense = false;
 // Gather advanced timing metrics for Profiler subtrees.
 
 
-// Track which interactions trigger each commit.
+// Trace which interactions trigger each commit.
 
 
 // Only used in www builds.
@@ -68471,8 +69792,8 @@ module.exports = react;
 }
 
 }).call(this,require('_process'))
-},{"_process":570,"object-assign":569,"prop-types/checkPropTypes":571}],588:[function(require,module,exports){
-/** @license React v16.5.1
+},{"_process":582,"object-assign":581,"prop-types/checkPropTypes":583}],600:[function(require,module,exports){
+/** @license React v16.5.2
  * react.production.min.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -68494,10 +69815,10 @@ function S(a,b,d,c){var e=typeof a;if("undefined"===e||"boolean"===e)a=null;var 
 function aa(a,b,d){var c=a.result,e=a.keyPrefix;a=a.func.call(a.context,b,a.count++);Array.isArray(a)?W(a,c,d,function(a){return a}):null!=a&&(N(a)&&(a=M(a,e+(!a.key||b&&b.key===a.key?"":(""+a.key).replace(O,"$&/")+"/")+d)),c.push(a))}function W(a,b,d,c,e){var g="";null!=d&&(g=(""+d).replace(O,"$&/")+"/");b=Q(b,g,c,e);U(a,aa,b);R(b)}function ba(a,b){var d=I.currentDispatcher;null===d?B("277"):void 0;return d.readContext(a,b)}
 var X={Children:{map:function(a,b,d){if(null==a)return a;var c=[];W(a,c,null,b,d);return c},forEach:function(a,b,d){if(null==a)return a;b=Q(null,null,b,d);U(a,V,b);R(b)},count:function(a){return U(a,function(){return null},null)},toArray:function(a){var b=[];W(a,b,null,function(a){return a});return b},only:function(a){N(a)?void 0:B("143");return a}},createRef:function(){return{current:null}},Component:E,PureComponent:G,createContext:function(a,b){void 0===b&&(b=null);a={$$typeof:w,_calculateChangedBits:b,
 _currentValue:a,_currentValue2:a,Provider:null,Consumer:null,unstable_read:null};a.Provider={$$typeof:v,_context:a};a.Consumer=a;a.unstable_read=ba.bind(null,a);return a},forwardRef:function(a){return{$$typeof:y,render:a}},Fragment:r,StrictMode:t,unstable_AsyncMode:x,unstable_Profiler:u,createElement:L,cloneElement:function(a,b,d){null===a||void 0===a?B("267",a):void 0;var c=void 0,e=m({},a.props),g=a.key,h=a.ref,f=a._owner;if(null!=b){void 0!==b.ref&&(h=b.ref,f=I.current);void 0!==b.key&&(g=""+b.key);
-var k=void 0;a.type&&a.type.defaultProps&&(k=a.type.defaultProps);for(c in b)J.call(b,c)&&!K.hasOwnProperty(c)&&(e[c]=void 0===b[c]&&void 0!==k?k[c]:b[c])}c=arguments.length-2;if(1===c)e.children=d;else if(1<c){k=Array(c);for(var l=0;l<c;l++)k[l]=arguments[l+2];e.children=k}return{$$typeof:p,type:a.type,key:g,ref:h,props:e,_owner:f}},createFactory:function(a){var b=L.bind(null,a);b.type=a;return b},isValidElement:N,version:"16.5.1",__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurrentOwner:I,
+var k=void 0;a.type&&a.type.defaultProps&&(k=a.type.defaultProps);for(c in b)J.call(b,c)&&!K.hasOwnProperty(c)&&(e[c]=void 0===b[c]&&void 0!==k?k[c]:b[c])}c=arguments.length-2;if(1===c)e.children=d;else if(1<c){k=Array(c);for(var l=0;l<c;l++)k[l]=arguments[l+2];e.children=k}return{$$typeof:p,type:a.type,key:g,ref:h,props:e,_owner:f}},createFactory:function(a){var b=L.bind(null,a);b.type=a;return b},isValidElement:N,version:"16.5.2",__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurrentOwner:I,
 assign:m}},Y={default:X},Z=Y&&X||Y;module.exports=Z.default||Z;
 
-},{"object-assign":569}],589:[function(require,module,exports){
+},{"object-assign":581}],601:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -68508,10 +69829,10 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/react.development.js":587,"./cjs/react.production.min.js":588,"_process":570}],590:[function(require,module,exports){
+},{"./cjs/react.development.js":599,"./cjs/react.production.min.js":600,"_process":582}],602:[function(require,module,exports){
 (function (process){
-/** @license React v16.5.1
- * schedule-tracking.development.js
+/** @license React v16.5.2
+ * schedule-tracing.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
  *
@@ -68559,8 +69880,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
 // Gather advanced timing metrics for Profiler subtrees.
 
 
-// Track which interactions trigger each commit.
-var enableSchedulerTracking = true;
+// Trace which interactions trigger each commit.
+var enableSchedulerTracing = true;
 
 // Only used in www builds.
 
@@ -68577,16 +69898,16 @@ var DEFAULT_THREAD_ID = 0;
 var interactionIDCounter = 0;
 var threadIDCounter = 0;
 
-// Set of currently tracked interactions.
+// Set of currently traced interactions.
 // Interactions "stack"–
-// Meaning that newly tracked interactions are appended to the previously active set.
+// Meaning that newly traced interactions are appended to the previously active set.
 // When an interaction goes out of scope, the previous set (if any) is restored.
 exports.__interactionsRef = null;
 
 // Listener(s) to notify when interactions begin and end.
 exports.__subscriberRef = null;
 
-if (enableSchedulerTracking) {
+if (enableSchedulerTracing) {
   exports.__interactionsRef = {
     current: new Set()
   };
@@ -68596,7 +69917,7 @@ if (enableSchedulerTracking) {
 }
 
 function unstable_clear(callback) {
-  if (!enableSchedulerTracking) {
+  if (!enableSchedulerTracing) {
     return callback();
   }
 
@@ -68611,7 +69932,7 @@ function unstable_clear(callback) {
 }
 
 function unstable_getCurrent() {
-  if (!enableSchedulerTracking) {
+  if (!enableSchedulerTracing) {
     return null;
   } else {
     return exports.__interactionsRef.current;
@@ -68622,10 +69943,10 @@ function unstable_getThreadID() {
   return ++threadIDCounter;
 }
 
-function unstable_track(name, timestamp, callback) {
+function unstable_trace(name, timestamp, callback) {
   var threadID = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : DEFAULT_THREAD_ID;
 
-  if (!enableSchedulerTracking) {
+  if (!enableSchedulerTracing) {
     return callback();
   }
 
@@ -68638,7 +69959,7 @@ function unstable_track(name, timestamp, callback) {
 
   var prevInteractions = exports.__interactionsRef.current;
 
-  // Tracked interactions should stack/accumulate.
+  // Traced interactions should stack/accumulate.
   // To do that, clone the current interactions.
   // The previous set will be restored upon completion.
   var interactions = new Set(prevInteractions);
@@ -68650,7 +69971,7 @@ function unstable_track(name, timestamp, callback) {
 
   try {
     if (subscriber !== null) {
-      subscriber.onInteractionTracked(interaction);
+      subscriber.onInteractionTraced(interaction);
     }
   } finally {
     try {
@@ -68686,7 +70007,7 @@ function unstable_track(name, timestamp, callback) {
 function unstable_wrap(callback) {
   var threadID = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : DEFAULT_THREAD_ID;
 
-  if (!enableSchedulerTracking) {
+  if (!enableSchedulerTracing) {
     return callback;
   }
 
@@ -68777,18 +70098,18 @@ function unstable_wrap(callback) {
 }
 
 var subscribers = null;
-if (enableSchedulerTracking) {
+if (enableSchedulerTracing) {
   subscribers = new Set();
 }
 
 function unstable_subscribe(subscriber) {
-  if (enableSchedulerTracking) {
+  if (enableSchedulerTracing) {
     subscribers.add(subscriber);
 
     if (subscribers.size === 1) {
       exports.__subscriberRef.current = {
         onInteractionScheduledWorkCompleted: onInteractionScheduledWorkCompleted,
-        onInteractionTracked: onInteractionTracked,
+        onInteractionTraced: onInteractionTraced,
         onWorkCanceled: onWorkCanceled,
         onWorkScheduled: onWorkScheduled,
         onWorkStarted: onWorkStarted,
@@ -68799,7 +70120,7 @@ function unstable_subscribe(subscriber) {
 }
 
 function unstable_unsubscribe(subscriber) {
-  if (enableSchedulerTracking) {
+  if (enableSchedulerTracing) {
     subscribers.delete(subscriber);
 
     if (subscribers.size === 0) {
@@ -68808,13 +70129,13 @@ function unstable_unsubscribe(subscriber) {
   }
 }
 
-function onInteractionTracked(interaction) {
+function onInteractionTraced(interaction) {
   var didCatchError = false;
   var caughtError = null;
 
   subscribers.forEach(function (subscriber) {
     try {
-      subscriber.onInteractionTracked(interaction);
+      subscriber.onInteractionTraced(interaction);
     } catch (error) {
       if (!didCatchError) {
         didCatchError = true;
@@ -68931,7 +70252,7 @@ function onWorkCanceled(interactions, threadID) {
 exports.unstable_clear = unstable_clear;
 exports.unstable_getCurrent = unstable_getCurrent;
 exports.unstable_getThreadID = unstable_getThreadID;
-exports.unstable_track = unstable_track;
+exports.unstable_trace = unstable_trace;
 exports.unstable_wrap = unstable_wrap;
 exports.unstable_subscribe = unstable_subscribe;
 exports.unstable_unsubscribe = unstable_unsubscribe;
@@ -68939,9 +70260,9 @@ exports.unstable_unsubscribe = unstable_unsubscribe;
 }
 
 }).call(this,require('_process'))
-},{"_process":570}],591:[function(require,module,exports){
-/** @license React v16.5.1
- * schedule-tracking.production.min.js
+},{"_process":582}],603:[function(require,module,exports){
+/** @license React v16.5.2
+ * schedule-tracing.production.min.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
  *
@@ -68949,11 +70270,11 @@ exports.unstable_unsubscribe = unstable_unsubscribe;
  * LICENSE file in the root directory of this source tree.
  */
 
-'use strict';Object.defineProperty(exports,"__esModule",{value:!0});var b=0;exports.__interactionsRef=null;exports.__subscriberRef=null;exports.unstable_clear=function(a){return a()};exports.unstable_getCurrent=function(){return null};exports.unstable_getThreadID=function(){return++b};exports.unstable_track=function(a,d,c){return c()};exports.unstable_wrap=function(a){return a};exports.unstable_subscribe=function(){};exports.unstable_unsubscribe=function(){};
+'use strict';Object.defineProperty(exports,"__esModule",{value:!0});var b=0;exports.__interactionsRef=null;exports.__subscriberRef=null;exports.unstable_clear=function(a){return a()};exports.unstable_getCurrent=function(){return null};exports.unstable_getThreadID=function(){return++b};exports.unstable_trace=function(a,d,c){return c()};exports.unstable_wrap=function(a){return a};exports.unstable_subscribe=function(){};exports.unstable_unsubscribe=function(){};
 
-},{}],592:[function(require,module,exports){
+},{}],604:[function(require,module,exports){
 (function (process){
-/** @license React v16.5.1
+/** @license React v16.5.2
  * schedule.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -68972,50 +70293,244 @@ if (process.env.NODE_ENV !== "production") {
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-var canUseDOM = !!(typeof window !== 'undefined' && window.document && window.document.createElement);
+/* eslint-disable no-var */
 
-/**
- * A scheduling library to allow scheduling work with more granular priority and
- * control than requestAnimationFrame and requestIdleCallback.
- * Current TODO items:
- * X- Pull out the scheduleWork polyfill built into React
- * X- Initial test coverage
- * X- Support for multiple callbacks
- * - Support for two priorities; serial and deferred
- * - Better test coverage
- * - Better docblock
- * - Polish documentation, API
- */
+// TODO: Currently there's only a single priority level, Deferred. Will add
+// additional priorities.
+var DEFERRED_TIMEOUT = 5000;
 
-// This is a built-in polyfill for requestIdleCallback. It works by scheduling
-// a requestAnimationFrame, storing the time for the start of the frame, then
-// scheduling a postMessage which gets scheduled after paint. Within the
-// postMessage handler do as much work as possible until time + frame rate.
-// By separating the idle call into a separate event tick we ensure that
+// Callbacks are stored as a circular, doubly linked list.
+var firstCallbackNode = null;
+
+var isPerformingWork = false;
+
+var isHostCallbackScheduled = false;
+
+var hasNativePerformanceNow = typeof performance === 'object' && typeof performance.now === 'function';
+
+var timeRemaining;
+if (hasNativePerformanceNow) {
+  timeRemaining = function () {
+    // We assume that if we have a performance timer that the rAF callback
+    // gets a performance timer value. Not sure if this is always true.
+    var remaining = getFrameDeadline() - performance.now();
+    return remaining > 0 ? remaining : 0;
+  };
+} else {
+  timeRemaining = function () {
+    // Fallback to Date.now()
+    var remaining = getFrameDeadline() - Date.now();
+    return remaining > 0 ? remaining : 0;
+  };
+}
+
+var deadlineObject = {
+  timeRemaining: timeRemaining,
+  didTimeout: false
+};
+
+function ensureHostCallbackIsScheduled() {
+  if (isPerformingWork) {
+    // Don't schedule work yet; wait until the next time we yield.
+    return;
+  }
+  // Schedule the host callback using the earliest timeout in the list.
+  var timesOutAt = firstCallbackNode.timesOutAt;
+  if (!isHostCallbackScheduled) {
+    isHostCallbackScheduled = true;
+  } else {
+    // Cancel the existing host callback.
+    cancelCallback();
+  }
+  requestCallback(flushWork, timesOutAt);
+}
+
+function flushFirstCallback(node) {
+  var flushedNode = firstCallbackNode;
+
+  // Remove the node from the list before calling the callback. That way the
+  // list is in a consistent state even if the callback throws.
+  var next = firstCallbackNode.next;
+  if (firstCallbackNode === next) {
+    // This is the last callback in the list.
+    firstCallbackNode = null;
+    next = null;
+  } else {
+    var previous = firstCallbackNode.previous;
+    firstCallbackNode = previous.next = next;
+    next.previous = previous;
+  }
+
+  flushedNode.next = flushedNode.previous = null;
+
+  // Now it's safe to call the callback.
+  var callback = flushedNode.callback;
+  callback(deadlineObject);
+}
+
+function flushWork(didTimeout) {
+  isPerformingWork = true;
+  deadlineObject.didTimeout = didTimeout;
+  try {
+    if (didTimeout) {
+      // Flush all the timed out callbacks without yielding.
+      while (firstCallbackNode !== null) {
+        // Read the current time. Flush all the callbacks that expire at or
+        // earlier than that time. Then read the current time again and repeat.
+        // This optimizes for as few performance.now calls as possible.
+        var currentTime = exports.unstable_now();
+        if (firstCallbackNode.timesOutAt <= currentTime) {
+          do {
+            flushFirstCallback();
+          } while (firstCallbackNode !== null && firstCallbackNode.timesOutAt <= currentTime);
+          continue;
+        }
+        break;
+      }
+    } else {
+      // Keep flushing callbacks until we run out of time in the frame.
+      if (firstCallbackNode !== null) {
+        do {
+          flushFirstCallback();
+        } while (firstCallbackNode !== null && getFrameDeadline() - exports.unstable_now() > 0);
+      }
+    }
+  } finally {
+    isPerformingWork = false;
+    if (firstCallbackNode !== null) {
+      // There's still work remaining. Request another callback.
+      ensureHostCallbackIsScheduled(firstCallbackNode);
+    } else {
+      isHostCallbackScheduled = false;
+    }
+  }
+}
+
+function unstable_scheduleWork(callback, options) {
+  var currentTime = exports.unstable_now();
+
+  var timesOutAt;
+  if (options !== undefined && options !== null && options.timeout !== null && options.timeout !== undefined) {
+    // Check for an explicit timeout
+    timesOutAt = currentTime + options.timeout;
+  } else {
+    // Compute an absolute timeout using the default constant.
+    timesOutAt = currentTime + DEFERRED_TIMEOUT;
+  }
+
+  var newNode = {
+    callback: callback,
+    timesOutAt: timesOutAt,
+    next: null,
+    previous: null
+  };
+
+  // Insert the new callback into the list, sorted by its timeout.
+  if (firstCallbackNode === null) {
+    // This is the first callback in the list.
+    firstCallbackNode = newNode.next = newNode.previous = newNode;
+    ensureHostCallbackIsScheduled(firstCallbackNode);
+  } else {
+    var next = null;
+    var node = firstCallbackNode;
+    do {
+      if (node.timesOutAt > timesOutAt) {
+        // The new callback times out before this one.
+        next = node;
+        break;
+      }
+      node = node.next;
+    } while (node !== firstCallbackNode);
+
+    if (next === null) {
+      // No callback with a later timeout was found, which means the new
+      // callback has the latest timeout in the list.
+      next = firstCallbackNode;
+    } else if (next === firstCallbackNode) {
+      // The new callback has the earliest timeout in the entire list.
+      firstCallbackNode = newNode;
+      ensureHostCallbackIsScheduled(firstCallbackNode);
+    }
+
+    var previous = next.previous;
+    previous.next = next.previous = newNode;
+    newNode.next = next;
+    newNode.previous = previous;
+  }
+
+  return newNode;
+}
+
+function unstable_cancelScheduledWork(callbackNode) {
+  var next = callbackNode.next;
+  if (next === null) {
+    // Already cancelled.
+    return;
+  }
+
+  if (next === callbackNode) {
+    // This is the only scheduled callback. Clear the list.
+    firstCallbackNode = null;
+  } else {
+    // Remove the callback from its position in the list.
+    if (callbackNode === firstCallbackNode) {
+      firstCallbackNode = next;
+    }
+    var previous = callbackNode.previous;
+    previous.next = next;
+    next.previous = previous;
+  }
+
+  callbackNode.next = callbackNode.previous = null;
+}
+
+// The remaining code is essentially a polyfill for requestIdleCallback. It
+// works by scheduling a requestAnimationFrame, storing the time for the start
+// of the frame, then scheduling a postMessage which gets scheduled after paint.
+// Within the postMessage handler do as much work as possible until time + frame
+// rate. By separating the idle call into a separate event tick we ensure that
 // layout, paint and other browser work is counted against the available time.
 // The frame rate is dynamically adjusted.
 
 // We capture a local reference to any global, in case it gets polyfilled after
-// this module is initially evaluated.
-// We want to be using a consistent implementation.
+// this module is initially evaluated. We want to be using a
+// consistent implementation.
 var localDate = Date;
 
-// This initialization code may run even on server environments
-// if a component just imports ReactDOM (e.g. for findDOMNode).
-// Some environments might not have setTimeout or clearTimeout.
-// However, we always expect them to be defined on the client.
-// https://github.com/facebook/react/pull/13088
+// This initialization code may run even on server environments if a component
+// just imports ReactDOM (e.g. for findDOMNode). Some environments might not
+// have setTimeout or clearTimeout. However, we always expect them to be defined
+// on the client. https://github.com/facebook/react/pull/13088
 var localSetTimeout = typeof setTimeout === 'function' ? setTimeout : undefined;
 var localClearTimeout = typeof clearTimeout === 'function' ? clearTimeout : undefined;
 
-// We don't expect either of these to necessarily be defined,
-// but we will error later if they are missing on the client.
+// We don't expect either of these to necessarily be defined, but we will error
+// later if they are missing on the client.
 var localRequestAnimationFrame = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : undefined;
 var localCancelAnimationFrame = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : undefined;
 
-var hasNativePerformanceNow = typeof performance === 'object' && typeof performance.now === 'function';
+// requestAnimationFrame does not run when the tab is in the background. If
+// we're backgrounded we prefer for that work to happen so that the page
+// continues to load in the background. So we also schedule a 'setTimeout' as
+// a fallback.
+// TODO: Need a better heuristic for backgrounded work.
+var ANIMATION_FRAME_TIMEOUT = 100;
+var rAFID;
+var rAFTimeoutID;
+var requestAnimationFrameWithTimeout = function (callback) {
+  // schedule rAF and also a setTimeout
+  rAFID = localRequestAnimationFrame(function (timestamp) {
+    // cancel the setTimeout
+    localClearTimeout(rAFTimeoutID);
+    callback(timestamp);
+  });
+  rAFTimeoutID = localSetTimeout(function () {
+    // cancel the requestAnimationFrame
+    localCancelAnimationFrame(rAFID);
+    callback(exports.unstable_now());
+  }, ANIMATION_FRAME_TIMEOUT);
+};
 
-exports.unstable_now = void 0;
 if (hasNativePerformanceNow) {
   var Performance = performance;
   exports.unstable_now = function () {
@@ -69027,80 +70542,46 @@ if (hasNativePerformanceNow) {
   };
 }
 
-exports.unstable_scheduleWork = void 0;
-exports.unstable_cancelScheduledWork = void 0;
+var requestCallback;
+var cancelCallback;
+var getFrameDeadline;
 
-if (!canUseDOM) {
-  var timeoutIds = new Map();
-
-  exports.unstable_scheduleWork = function (callback, options) {
-    // keeping return type consistent
-    var callbackConfig = {
-      scheduledCallback: callback,
-      timeoutTime: 0,
-      next: null,
-      prev: null
-    };
-    var timeoutId = localSetTimeout(function () {
-      callback({
-        timeRemaining: function () {
-          return Infinity;
-        },
-
-        didTimeout: false
-      });
-    });
-    timeoutIds.set(callback, timeoutId);
-    return callbackConfig;
+if (typeof window === 'undefined') {
+  // If this accidentally gets imported in a non-browser environment, fallback
+  // to a naive implementation.
+  var timeoutID = -1;
+  requestCallback = function (callback, absoluteTimeout) {
+    timeoutID = setTimeout(callback, 0, true);
   };
-  exports.unstable_cancelScheduledWork = function (callbackId) {
-    var callback = callbackId.scheduledCallback;
-    var timeoutId = timeoutIds.get(callback);
-    timeoutIds.delete(callbackId);
-    localClearTimeout(timeoutId);
+  cancelCallback = function () {
+    clearTimeout(timeoutID);
   };
+  getFrameDeadline = function () {
+    return 0;
+  };
+} else if (window._schedMock) {
+  // Dynamic injection, only for testing purposes.
+  var impl = window._schedMock;
+  requestCallback = impl[0];
+  cancelCallback = impl[1];
+  getFrameDeadline = impl[2];
 } else {
-  {
-    if (typeof console !== 'undefined') {
-      if (typeof localRequestAnimationFrame !== 'function') {
-        console.error("This browser doesn't support requestAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
-      }
-      if (typeof localCancelAnimationFrame !== 'function') {
-        console.error("This browser doesn't support cancelAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
-      }
+  if (typeof console !== 'undefined') {
+    if (typeof localRequestAnimationFrame !== 'function') {
+      console.error("This browser doesn't support requestAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
+    }
+    if (typeof localCancelAnimationFrame !== 'function') {
+      console.error("This browser doesn't support cancelAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
     }
   }
 
-  var headOfPendingCallbacksLinkedList = null;
-  var tailOfPendingCallbacksLinkedList = null;
-
-  // We track what the next soonest timeoutTime is, to be able to quickly tell
-  // if none of the scheduled callbacks have timed out.
-  var nextSoonestTimeoutTime = -1;
-
+  var scheduledCallback = null;
   var isIdleScheduled = false;
+  var timeoutTime = -1;
+
   var isAnimationFrameScheduled = false;
 
-  // requestAnimationFrame does not run when the tab is in the background.
-  // if we're backgrounded we prefer for that work to happen so that the page
-  // continues	to load in the background.
-  // so we also schedule a 'setTimeout' as a fallback.
-  var animationFrameTimeout = 100;
-  var rafID = void 0;
-  var timeoutID = void 0;
-  var scheduleAnimationFrameWithFallbackSupport = function (callback) {
-    // schedule rAF and also a setTimeout
-    rafID = localRequestAnimationFrame(function (timestamp) {
-      // cancel the setTimeout
-      localClearTimeout(timeoutID);
-      callback(timestamp);
-    });
-    timeoutID = localSetTimeout(function () {
-      // cancel the requestAnimationFrame
-      localCancelAnimationFrame(rafID);
-      callback(exports.unstable_now());
-    }, animationFrameTimeout);
-  };
+  var isPerformingIdleWork = false;
 
   var frameDeadline = 0;
   // We start out assuming that we run at 30fps but then the heuristic tracking
@@ -69109,93 +70590,8 @@ if (!canUseDOM) {
   var previousFrameTime = 33;
   var activeFrameTime = 33;
 
-  var frameDeadlineObject = {
-    didTimeout: false,
-    timeRemaining: function () {
-      var remaining = frameDeadline - exports.unstable_now();
-      return remaining > 0 ? remaining : 0;
-    }
-  };
-
-  /**
-   * Handles the case where a callback errors:
-   * - don't catch the error, because this changes debugging behavior
-   * - do start a new postMessage callback, to call any remaining callbacks,
-   * - but only if there is an error, so there is not extra overhead.
-   */
-  var callUnsafely = function (callbackConfig, arg) {
-    var callback = callbackConfig.scheduledCallback;
-    var finishedCalling = false;
-    try {
-      callback(arg);
-      finishedCalling = true;
-    } finally {
-      // always remove it from linked list
-      exports.unstable_cancelScheduledWork(callbackConfig);
-
-      if (!finishedCalling) {
-        // an error must have been thrown
-        isIdleScheduled = true;
-        window.postMessage(messageKey, '*');
-      }
-    }
-  };
-
-  /**
-   * Checks for timed out callbacks, runs them, and then checks again to see if
-   * any more have timed out.
-   * Keeps doing this until there are none which have currently timed out.
-   */
-  var callTimedOutCallbacks = function () {
-    if (headOfPendingCallbacksLinkedList === null) {
-      return;
-    }
-
-    var currentTime = exports.unstable_now();
-    // TODO: this would be more efficient if deferred callbacks are stored in
-    // min heap.
-    // Or in a linked list with links for both timeoutTime order and insertion
-    // order.
-    // For now an easy compromise is the current approach:
-    // Keep a pointer to the soonest timeoutTime, and check that first.
-    // If it has not expired, we can skip traversing the whole list.
-    // If it has expired, then we step through all the callbacks.
-    if (nextSoonestTimeoutTime === -1 || nextSoonestTimeoutTime > currentTime) {
-      // We know that none of them have timed out yet.
-      return;
-    }
-    // NOTE: we intentionally wait to update the nextSoonestTimeoutTime until
-    // after successfully calling any timed out callbacks.
-    // If a timed out callback throws an error, we could get stuck in a state
-    // where the nextSoonestTimeoutTime was set wrong.
-    var updatedNextSoonestTimeoutTime = -1; // we will update nextSoonestTimeoutTime below
-    var timedOutCallbacks = [];
-
-    // iterate once to find timed out callbacks and find nextSoonestTimeoutTime
-    var currentCallbackConfig = headOfPendingCallbacksLinkedList;
-    while (currentCallbackConfig !== null) {
-      var _timeoutTime = currentCallbackConfig.timeoutTime;
-      if (_timeoutTime !== -1 && _timeoutTime <= currentTime) {
-        // it has timed out!
-        timedOutCallbacks.push(currentCallbackConfig);
-      } else {
-        if (_timeoutTime !== -1 && (updatedNextSoonestTimeoutTime === -1 || _timeoutTime < updatedNextSoonestTimeoutTime)) {
-          updatedNextSoonestTimeoutTime = _timeoutTime;
-        }
-      }
-      currentCallbackConfig = currentCallbackConfig.next;
-    }
-
-    if (timedOutCallbacks.length > 0) {
-      frameDeadlineObject.didTimeout = true;
-      for (var i = 0, len = timedOutCallbacks.length; i < len; i++) {
-        callUnsafely(timedOutCallbacks[i], frameDeadlineObject);
-      }
-    }
-
-    // NOTE: we intentionally wait to update the nextSoonestTimeoutTime until
-    // after successfully calling any timed out callbacks.
-    nextSoonestTimeoutTime = updatedNextSoonestTimeoutTime;
+  getFrameDeadline = function () {
+    return frameDeadline;
   };
 
   // We use the postMessage trick to defer idle work until after the repaint.
@@ -69204,29 +70600,40 @@ if (!canUseDOM) {
     if (event.source !== window || event.data !== messageKey) {
       return;
     }
+
     isIdleScheduled = false;
 
-    if (headOfPendingCallbacksLinkedList === null) {
-      return;
-    }
-
-    // First call anything which has timed out, until we have caught up.
-    callTimedOutCallbacks();
-
     var currentTime = exports.unstable_now();
-    // Next, as long as we have idle time, try calling more callbacks.
-    while (frameDeadline - currentTime > 0 && headOfPendingCallbacksLinkedList !== null) {
-      var latestCallbackConfig = headOfPendingCallbacksLinkedList;
-      frameDeadlineObject.didTimeout = false;
-      // callUnsafely will remove it from the head of the linked list
-      callUnsafely(latestCallbackConfig, frameDeadlineObject);
-      currentTime = exports.unstable_now();
+
+    var didTimeout = false;
+    if (frameDeadline - currentTime <= 0) {
+      // There's no time left in this idle period. Check if the callback has
+      // a timeout and whether it's been exceeded.
+      if (timeoutTime !== -1 && timeoutTime <= currentTime) {
+        // Exceeded the timeout. Invoke the callback even though there's no
+        // time left.
+        didTimeout = true;
+      } else {
+        // No timeout.
+        if (!isAnimationFrameScheduled) {
+          // Schedule another animation callback so we retry later.
+          isAnimationFrameScheduled = true;
+          requestAnimationFrameWithTimeout(animationTick);
+        }
+        // Exit without invoking the callback.
+        return;
+      }
     }
-    if (headOfPendingCallbacksLinkedList !== null) {
-      if (!isAnimationFrameScheduled) {
-        // Schedule another animation callback so we retry later.
-        isAnimationFrameScheduled = true;
-        scheduleAnimationFrameWithFallbackSupport(animationTick);
+
+    timeoutTime = -1;
+    var callback = scheduledCallback;
+    scheduledCallback = null;
+    if (callback !== null) {
+      isPerformingIdleWork = true;
+      try {
+        callback(didTimeout);
+      } finally {
+        isPerformingIdleWork = false;
       }
     }
   };
@@ -69261,117 +70668,38 @@ if (!canUseDOM) {
     }
   };
 
-  exports.unstable_scheduleWork = function (callback, options) /* CallbackConfigType */{
-    var timeoutTime = -1;
-    if (options != null && typeof options.timeout === 'number') {
-      timeoutTime = exports.unstable_now() + options.timeout;
-    }
-    if (nextSoonestTimeoutTime === -1 || timeoutTime !== -1 && timeoutTime < nextSoonestTimeoutTime) {
-      nextSoonestTimeoutTime = timeoutTime;
-    }
-
-    var scheduledCallbackConfig = {
-      scheduledCallback: callback,
-      timeoutTime: timeoutTime,
-      prev: null,
-      next: null
-    };
-    if (headOfPendingCallbacksLinkedList === null) {
-      // Make this callback the head and tail of our list
-      headOfPendingCallbacksLinkedList = scheduledCallbackConfig;
-      tailOfPendingCallbacksLinkedList = scheduledCallbackConfig;
-    } else {
-      // Add latest callback as the new tail of the list
-      scheduledCallbackConfig.prev = tailOfPendingCallbacksLinkedList;
-      // renaming for clarity
-      var oldTailOfPendingCallbacksLinkedList = tailOfPendingCallbacksLinkedList;
-      if (oldTailOfPendingCallbacksLinkedList !== null) {
-        oldTailOfPendingCallbacksLinkedList.next = scheduledCallbackConfig;
-      }
-      tailOfPendingCallbacksLinkedList = scheduledCallbackConfig;
-    }
-
-    if (!isAnimationFrameScheduled) {
+  requestCallback = function (callback, absoluteTimeout) {
+    scheduledCallback = callback;
+    timeoutTime = absoluteTimeout;
+    if (isPerformingIdleWork) {
+      // If we're already performing idle work, an error must have been thrown.
+      // Don't wait for the next frame. Continue working ASAP, in a new event.
+      window.postMessage(messageKey, '*');
+    } else if (!isAnimationFrameScheduled) {
       // If rAF didn't already schedule one, we need to schedule a frame.
       // TODO: If this rAF doesn't materialize because the browser throttles, we
-      // might want to still have setTimeout trigger scheduleWork as a backup to ensure
+      // might want to still have setTimeout trigger rIC as a backup to ensure
       // that we keep performing work.
       isAnimationFrameScheduled = true;
-      scheduleAnimationFrameWithFallbackSupport(animationTick);
+      requestAnimationFrameWithTimeout(animationTick);
     }
-    return scheduledCallbackConfig;
   };
 
-  exports.unstable_cancelScheduledWork = function (callbackConfig /* CallbackConfigType */
-  ) {
-    if (callbackConfig.prev === null && headOfPendingCallbacksLinkedList !== callbackConfig) {
-      // this callbackConfig has already been cancelled.
-      // cancelScheduledWork should be idempotent, a no-op after first call.
-      return;
-    }
-
-    /**
-     * There are four possible cases:
-     * - Head/nodeToRemove/Tail -> null
-     *   In this case we set Head and Tail to null.
-     * - Head -> ... middle nodes... -> Tail/nodeToRemove
-     *   In this case we point the middle.next to null and put middle as the new
-     *   Tail.
-     * - Head/nodeToRemove -> ...middle nodes... -> Tail
-     *   In this case we point the middle.prev at null and move the Head to
-     *   middle.
-     * - Head -> ... ?some nodes ... -> nodeToRemove -> ... ?some nodes ... -> Tail
-     *   In this case we point the Head.next to the Tail and the Tail.prev to
-     *   the Head.
-     */
-    var next = callbackConfig.next;
-    var prev = callbackConfig.prev;
-    callbackConfig.next = null;
-    callbackConfig.prev = null;
-    if (next !== null) {
-      // we have a next
-
-      if (prev !== null) {
-        // we have a prev
-
-        // callbackConfig is somewhere in the middle of a list of 3 or more nodes.
-        prev.next = next;
-        next.prev = prev;
-        return;
-      } else {
-        // there is a next but not a previous one;
-        // callbackConfig is the head of a list of 2 or more other nodes.
-        next.prev = null;
-        headOfPendingCallbacksLinkedList = next;
-        return;
-      }
-    } else {
-      // there is no next callback config; this must the tail of the list
-
-      if (prev !== null) {
-        // we have a prev
-
-        // callbackConfig is the tail of a list of 2 or more other nodes.
-        prev.next = null;
-        tailOfPendingCallbacksLinkedList = prev;
-        return;
-      } else {
-        // there is no previous callback config;
-        // callbackConfig is the only thing in the linked list,
-        // so both head and tail point to it.
-        headOfPendingCallbacksLinkedList = null;
-        tailOfPendingCallbacksLinkedList = null;
-        return;
-      }
-    }
+  cancelCallback = function () {
+    scheduledCallback = null;
+    isIdleScheduled = false;
+    timeoutTime = -1;
   };
 }
+
+exports.unstable_scheduleWork = unstable_scheduleWork;
+exports.unstable_cancelScheduledWork = unstable_cancelScheduledWork;
   })();
 }
 
 }).call(this,require('_process'))
-},{"_process":570}],593:[function(require,module,exports){
-/** @license React v16.5.1
+},{"_process":582}],605:[function(require,module,exports){
+/** @license React v16.5.2
  * schedule.production.min.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -69380,14 +70708,15 @@ if (!canUseDOM) {
  * LICENSE file in the root directory of this source tree.
  */
 
-'use strict';Object.defineProperty(exports,"__esModule",{value:!0});var d=!("undefined"===typeof window||!window.document||!window.document.createElement),f=Date,g="function"===typeof setTimeout?setTimeout:void 0,h="function"===typeof clearTimeout?clearTimeout:void 0,l="function"===typeof requestAnimationFrame?requestAnimationFrame:void 0,m="function"===typeof cancelAnimationFrame?cancelAnimationFrame:void 0,n="object"===typeof performance&&"function"===typeof performance.now;
-exports.unstable_now=void 0;if(n){var p=performance;exports.unstable_now=function(){return p.now()}}else exports.unstable_now=function(){return f.now()};exports.unstable_scheduleWork=void 0;exports.unstable_cancelScheduledWork=void 0;
-if(d){var q=null,r=null,t=-1,u=!1,v=!1,w=void 0,x=void 0,y=function(a){w=l(function(b){h(x);a(b)});x=g(function(){m(w);a(exports.unstable_now())},100)},z=0,A=33,B=33,C={didTimeout:!1,timeRemaining:function(){var a=z-exports.unstable_now();return 0<a?a:0}},E=function(a,b){var c=a.scheduledCallback,e=!1;try{c(b),e=!0}finally{exports.unstable_cancelScheduledWork(a),e||(u=!0,window.postMessage(D,"*"))}},D="__reactIdleCallback$"+Math.random().toString(36).slice(2);window.addEventListener("message",function(a){if(a.source===
-window&&a.data===D&&(u=!1,null!==q)){if(null!==q){var b=exports.unstable_now();if(!(-1===t||t>b)){a=-1;for(var c=[],e=q;null!==e;){var k=e.timeoutTime;-1!==k&&k<=b?c.push(e):-1!==k&&(-1===a||k<a)&&(a=k);e=e.next}if(0<c.length)for(C.didTimeout=!0,b=0,e=c.length;b<e;b++)E(c[b],C);t=a}}for(a=exports.unstable_now();0<z-a&&null!==q;)a=q,C.didTimeout=!1,E(a,C),a=exports.unstable_now();null===q||v||(v=!0,y(F))}},!1);var F=function(a){v=!1;var b=a-z+B;b<B&&A<B?(8>b&&(b=8),B=b<A?A:b):A=b;z=a+B;u||(u=!0,window.postMessage(D,
-"*"))};exports.unstable_scheduleWork=function(a,b){var c=-1;null!=b&&"number"===typeof b.timeout&&(c=exports.unstable_now()+b.timeout);if(-1===t||-1!==c&&c<t)t=c;a={scheduledCallback:a,timeoutTime:c,prev:null,next:null};null===q?q=a:(b=a.prev=r,null!==b&&(b.next=a));r=a;v||(v=!0,y(F));return a};exports.unstable_cancelScheduledWork=function(a){if(null!==a.prev||q===a){var b=a.next,c=a.prev;a.next=null;a.prev=null;null!==b?null!==c?(c.next=b,b.prev=c):(b.prev=null,q=b):null!==c?(c.next=null,r=c):r=
-q=null}}}else{var G=new Map;exports.unstable_scheduleWork=function(a){var b={scheduledCallback:a,timeoutTime:0,next:null,prev:null},c=g(function(){a({timeRemaining:function(){return Infinity},didTimeout:!1})});G.set(a,c);return b};exports.unstable_cancelScheduledWork=function(a){var b=G.get(a.scheduledCallback);G.delete(a);h(b)}};
+'use strict';Object.defineProperty(exports,"__esModule",{value:!0});var c=null,e=!1,f=!1,g="object"===typeof performance&&"function"===typeof performance.now,l={timeRemaining:g?function(){var a=h()-performance.now();return 0<a?a:0}:function(){var a=h()-Date.now();return 0<a?a:0},didTimeout:!1};function m(){if(!e){var a=c.timesOutAt;f?n():f=!0;p(q,a)}}function r(){var a=c,b=c.next;if(c===b)c=null;else{var d=c.previous;c=d.next=b;b.previous=d}a.next=a.previous=null;a=a.callback;a(l)}
+function q(a){e=!0;l.didTimeout=a;try{if(a)for(;null!==c;){var b=exports.unstable_now();if(c.timesOutAt<=b){do r();while(null!==c&&c.timesOutAt<=b)}else break}else if(null!==c){do r();while(null!==c&&0<h()-exports.unstable_now())}}finally{e=!1,null!==c?m(c):f=!1}}
+var t=Date,u="function"===typeof setTimeout?setTimeout:void 0,v="function"===typeof clearTimeout?clearTimeout:void 0,w="function"===typeof requestAnimationFrame?requestAnimationFrame:void 0,x="function"===typeof cancelAnimationFrame?cancelAnimationFrame:void 0,y,z;function A(a){y=w(function(b){v(z);a(b)});z=u(function(){x(y);a(exports.unstable_now())},100)}if(g){var B=performance;exports.unstable_now=function(){return B.now()}}else exports.unstable_now=function(){return t.now()};var p,n,h;
+if("undefined"===typeof window){var C=-1;p=function(a){C=setTimeout(a,0,!0)};n=function(){clearTimeout(C)};h=function(){return 0}}else if(window._schedMock){var D=window._schedMock;p=D[0];n=D[1];h=D[2]}else{"undefined"!==typeof console&&("function"!==typeof w&&console.error("This browser doesn't support requestAnimationFrame. Make sure that you load a polyfill in older browsers. https://fb.me/react-polyfills"),"function"!==typeof x&&console.error("This browser doesn't support cancelAnimationFrame. Make sure that you load a polyfill in older browsers. https://fb.me/react-polyfills"));
+var E=null,F=!1,G=-1,H=!1,I=!1,J=0,K=33,L=33;h=function(){return J};var M="__reactIdleCallback$"+Math.random().toString(36).slice(2);window.addEventListener("message",function(a){if(a.source===window&&a.data===M){F=!1;var b=exports.unstable_now();a=!1;if(0>=J-b)if(-1!==G&&G<=b)a=!0;else{H||(H=!0,A(N));return}G=-1;b=E;E=null;if(null!==b){I=!0;try{b(a)}finally{I=!1}}}},!1);var N=function(a){H=!1;var b=a-J+L;b<L&&K<L?(8>b&&(b=8),L=b<K?K:b):K=b;J=a+L;F||(F=!0,window.postMessage(M,"*"))};p=function(a,
+b){E=a;G=b;I?window.postMessage(M,"*"):H||(H=!0,A(N))};n=function(){E=null;F=!1;G=-1}}exports.unstable_scheduleWork=function(a,b){var d=exports.unstable_now();b=void 0!==b&&null!==b&&null!==b.timeout&&void 0!==b.timeout?d+b.timeout:d+5E3;a={callback:a,timesOutAt:b,next:null,previous:null};if(null===c)c=a.next=a.previous=a,m(c);else{d=null;var k=c;do{if(k.timesOutAt>b){d=k;break}k=k.next}while(k!==c);null===d?d=c:d===c&&(c=a,m(c));b=d.previous;b.next=d.previous=a;a.next=d;a.previous=b}return a};
+exports.unstable_cancelScheduledWork=function(a){var b=a.next;if(null!==b){if(b===a)c=null;else{a===c&&(c=b);var d=a.previous;d.next=b;b.previous=d}a.next=a.previous=null}};
 
-},{}],594:[function(require,module,exports){
+},{}],606:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -69398,18 +70727,18 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 }).call(this,require('_process'))
-},{"./cjs/schedule.development.js":592,"./cjs/schedule.production.min.js":593,"_process":570}],595:[function(require,module,exports){
+},{"./cjs/schedule.development.js":604,"./cjs/schedule.production.min.js":605,"_process":582}],607:[function(require,module,exports){
 (function (process){
 'use strict';
 
 if (process.env.NODE_ENV === 'production') {
-  module.exports = require('./cjs/schedule-tracking.production.min.js');
+  module.exports = require('./cjs/schedule-tracing.production.min.js');
 } else {
-  module.exports = require('./cjs/schedule-tracking.development.js');
+  module.exports = require('./cjs/schedule-tracing.development.js');
 }
 
 }).call(this,require('_process'))
-},{"./cjs/schedule-tracking.development.js":590,"./cjs/schedule-tracking.production.min.js":591,"_process":570}],596:[function(require,module,exports){
+},{"./cjs/schedule-tracing.development.js":602,"./cjs/schedule-tracing.production.min.js":603,"_process":582}],608:[function(require,module,exports){
 // A library of seedable RNGs implemented in Javascript.
 //
 // Usage:
@@ -69471,7 +70800,7 @@ sr.tychei = tychei;
 
 module.exports = sr;
 
-},{"./lib/alea":597,"./lib/tychei":598,"./lib/xor128":599,"./lib/xor4096":600,"./lib/xorshift7":601,"./lib/xorwow":602,"./seedrandom":603}],597:[function(require,module,exports){
+},{"./lib/alea":609,"./lib/tychei":610,"./lib/xor128":611,"./lib/xor4096":612,"./lib/xorshift7":613,"./lib/xorwow":614,"./seedrandom":615}],609:[function(require,module,exports){
 // A port of an algorithm by Johannes Baagøe <baagoe@baagoe.com>, 2010
 // http://baagoe.com/en/RandomMusings/javascript/
 // https://github.com/nquinlan/better-random-numbers-for-javascript-mirror
@@ -69587,7 +70916,7 @@ if (module && module.exports) {
 
 
 
-},{}],598:[function(require,module,exports){
+},{}],610:[function(require,module,exports){
 // A Javascript implementaion of the "Tyche-i" prng algorithm by
 // Samuel Neves and Filipe Araujo.
 // See https://eden.dei.uc.pt/~sneves/pubs/2011-snfa2.pdf
@@ -69692,7 +71021,7 @@ if (module && module.exports) {
 
 
 
-},{}],599:[function(require,module,exports){
+},{}],611:[function(require,module,exports){
 // A Javascript implementaion of the "xor128" prng algorithm by
 // George Marsaglia.  See http://www.jstatsoft.org/v08/i14/paper
 
@@ -69775,7 +71104,7 @@ if (module && module.exports) {
 
 
 
-},{}],600:[function(require,module,exports){
+},{}],612:[function(require,module,exports){
 // A Javascript implementaion of Richard Brent's Xorgens xor4096 algorithm.
 //
 // This fast non-cryptographic random number generator is designed for
@@ -69923,7 +71252,7 @@ if (module && module.exports) {
   (typeof define) == 'function' && define   // present with an AMD loader
 );
 
-},{}],601:[function(require,module,exports){
+},{}],613:[function(require,module,exports){
 // A Javascript implementaion of the "xorshift7" algorithm by
 // François Panneton and Pierre L'ecuyer:
 // "On the Xorgshift Random Number Generators"
@@ -70022,7 +71351,7 @@ if (module && module.exports) {
 );
 
 
-},{}],602:[function(require,module,exports){
+},{}],614:[function(require,module,exports){
 // A Javascript implementaion of the "xorwow" prng algorithm by
 // George Marsaglia.  See http://www.jstatsoft.org/v08/i14/paper
 
@@ -70110,7 +71439,7 @@ if (module && module.exports) {
 
 
 
-},{}],603:[function(require,module,exports){
+},{}],615:[function(require,module,exports){
 /*
 Copyright 2014 David Bau.
 
@@ -70362,7 +71691,7 @@ if ((typeof module) == 'object' && module.exports) {
   Math    // math: package containing random, pow, and seedrandom
 );
 
-},{"crypto":242}],604:[function(require,module,exports){
+},{"crypto":254}],616:[function(require,module,exports){
 (function (setImmediate,clearImmediate){
 var nextTick = require('process/browser.js').nextTick;
 var apply = Function.prototype.apply;
@@ -70441,7 +71770,7 @@ exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate :
   delete immediateIds[id];
 };
 }).call(this,require("timers").setImmediate,require("timers").clearImmediate)
-},{"process/browser.js":570,"timers":604}],605:[function(require,module,exports){
+},{"process/browser.js":582,"timers":616}],617:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -70521,7 +71850,7 @@ var DateTranslator = function (_React$Component) {
 
 exports.default = DateTranslator;
 
-},{"@tensorflow/tfjs":237,"react":589}],606:[function(require,module,exports){
+},{"@tensorflow/tfjs":249,"react":601}],618:[function(require,module,exports){
 'use strict';
 
 require('babel-polyfill');
@@ -70556,4 +71885,4 @@ _reactDom2.default.render(_react2.default.createElement(
   _react2.default.createElement(_DateTranslator2.default, null)
 ), appNode);
 
-},{"./DateTranslator":605,"babel-polyfill":239,"react":589,"react-dom":586}]},{},[606]);
+},{"./DateTranslator":617,"babel-polyfill":251,"react":601,"react-dom":598}]},{},[618]);
