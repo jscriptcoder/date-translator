@@ -56,20 +56,40 @@ const machineVocab = {
   '9': 10
 }
 
-function string2int(string, length, vocab) {
-  string = string.toLowerCase().replace(',','')
+const invMachineVocab = {
+  0: '-',
+  1: '0',
+  2: '1',
+  3: '2',
+  4: '3',
+  5: '4',
+  6: '5',
+  7: '6',
+  8: '7',
+  9: '8',
+  10: '9'
+}
 
-  if (string.length > length) {
-    string = string.slice(0, length)
+function string2int(str, length, vocab) {
+  str = str
+    .toLowerCase()
+    .replace(',','')
+
+  if (str.length > length) {
+    str = str.slice(0, length)
   }
 
-  rep = string.split('').map(char => humanVocab[char] || humanVocab['<unk>'])
+  let intArr = str
+    .split('')
+    .map(char => humanVocab[char] || humanVocab['<unk>'])
 
-  if (string.length < length) {
-    rep = rep.concat(new Array(length - string.length).fill(humanVocab['<pad>']))
+  if (str.length < length) {
+    intArr = intArr.concat(
+      new Array(length - str.length).fill(humanVocab['<pad>'])
+    )
   }
 
-  return rep
+  return intArr
 }
 
 const example = '21th of August 2016'
@@ -79,13 +99,22 @@ export default class DateTranslator extends React.Component {
   async componentDidMount() {
     this.model = await tf.loadModel('./tfjsmodel/model.json');
 
+    const tx = 30
     const m = 1
     const ns = 64
-    const s0 = tf.zeros([m, n_s])
-    const c0 = tf.zeros([m, n_s])
-    const source = tf.tensor(string2int(example))
+    const s0 = tf.zeros([m, ns], 'int32')
+    const c0 = tf.zeros([m, ns], 'int32')
+    const numClasses = Object.keys(humanVocab).length
 
-    console.log(this.model.predict([source, s0, c0]))
+    let source = string2int(example, tx)
+    source = tf.oneHot(tf.tensor1d(source, 'int32'), numClasses)
+    source = source.reshape([m].concat(source.shape))
+
+    console.log(this.model)
+    console.log([source, s0, c0])
+
+    const pred = this.model.predict([source, s0, c0])
+
   }
 
   render() {

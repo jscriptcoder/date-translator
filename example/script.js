@@ -73178,6 +73178,95 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
+var humanVocab = {
+  ' ': 0,
+  '-': 1,
+  '.': 2,
+  '/': 3,
+  '0': 4,
+  '1': 5,
+  '2': 6,
+  '3': 7,
+  '4': 8,
+  '5': 9,
+  '6': 10,
+  '7': 11,
+  '8': 12,
+  '9': 13,
+  'a': 14,
+  'b': 15,
+  'c': 16,
+  'd': 17,
+  'e': 18,
+  'f': 19,
+  'g': 20,
+  'h': 21,
+  'i': 22,
+  'j': 23,
+  'l': 24,
+  'm': 25,
+  'n': 26,
+  'o': 27,
+  'p': 28,
+  'r': 29,
+  's': 30,
+  't': 31,
+  'u': 32,
+  'v': 33,
+  'w': 34,
+  'y': 35,
+  '<unk>': 36,
+  '<pad>': 37
+};
+
+var machineVocab = {
+  '-': 0,
+  '0': 1,
+  '1': 2,
+  '2': 3,
+  '3': 4,
+  '4': 5,
+  '5': 6,
+  '6': 7,
+  '7': 8,
+  '8': 9,
+  '9': 10
+};
+
+var invMachineVocab = {
+  0: '-',
+  1: '0',
+  2: '1',
+  3: '2',
+  4: '3',
+  5: '4',
+  6: '5',
+  7: '6',
+  8: '7',
+  9: '8',
+  10: '9'
+};
+
+function string2int(str, length, vocab) {
+  str = str.toLowerCase().replace(',', '');
+
+  if (str.length > length) {
+    str = str.slice(0, length);
+  }
+
+  var intArr = str.split('').map(function (char) {
+    return humanVocab[char] || humanVocab['<unk>'];
+  });
+
+  if (str.length < length) {
+    intArr = intArr.concat(new Array(length - str.length).fill(humanVocab['<pad>']));
+  }
+
+  return intArr;
+}
+
+var example = '21th of August 2016';
+
 var DateTranslator = function (_React$Component) {
   _inherits(DateTranslator, _React$Component);
 
@@ -73191,6 +73280,7 @@ var DateTranslator = function (_React$Component) {
     key: 'componentDidMount',
     value: function () {
       var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
+        var tx, m, ns, s0, c0, numClasses, source, pred;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
@@ -73200,10 +73290,30 @@ var DateTranslator = function (_React$Component) {
 
               case 2:
                 this.model = _context.sent;
+                tx = 30;
+                m = 1;
+                ns = 64;
+                s0 = tf.zeros([m, ns], 'int32');
+                c0 = tf.zeros([m, ns], 'int32');
+                numClasses = Object.keys(humanVocab).length;
+                source = string2int(example, tx);
+
+                source = tf.oneHot(tf.tensor1d(source, 'int32'), numClasses);
+                source = source.reshape([m].concat(source.shape));
 
                 console.log(this.model);
+                console.log([source, s0, c0]);
 
-              case 4:
+                pred = this.model.predict([source, s0, c0]);
+
+
+                pred.forEach(function (p) {
+                  return console.log(p.argMax().print());
+                });
+
+                // output = [inv_machine_vocab[int(i)] for i in prediction]
+
+              case 16:
               case 'end':
                 return _context.stop();
             }
