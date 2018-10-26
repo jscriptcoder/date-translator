@@ -5,6 +5,7 @@ export default class DateTranslator extends React.Component {
 
   async componentDidMount() {
     this.model = await tf.loadModel('./tfjsmodel/model.json');
+    console.log(this.model)
   }
 
   render() {

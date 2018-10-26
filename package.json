@@ -44,8 +44,8 @@
     "watch": "^1.0.2"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "^0.13.2",
-    "react": "^16.5.2",
-    "react-dom": "^16.5.2"
+    "@tensorflow/tfjs": "^0.13.3",
+    "react": "^16.6.0",
+    "react-dom": "^16.6.0"
   }
 }
