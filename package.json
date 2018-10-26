@@ -33,17 +33,20 @@
   },
   "homepage": "https://github.com/jscriptcoder/date-translator#readme",
   "devDependencies": {
-    "babel-cli": "^6.26.0",
-    "babel-core": "^6.26.3",
-    "babel-preset-env": "^1.7.0",
-    "babel-preset-react": "^6.24.1",
-    "babelify": "^8.0.0",
+    "@babel/cli": "^7.1.2",
+    "@babel/core": "^7.1.2",
+    "@babel/plugin-proposal-class-properties": "^7.1.0",
+    "@babel/plugin-transform-async-to-generator": "^7.1.0",
+    "@babel/preset-env": "^7.1.0",
+    "@babel/preset-react": "^7.0.0",
+    "babelify": "^10.0.0",
     "browserify": "^16.2.3",
     "live-server": "^1.2.0",
     "node-sass": "^4.9.4",
     "watch": "^1.0.2"
   },
   "dependencies": {
+    "@babel/polyfill": "^7.0.0",
     "@tensorflow/tfjs": "^0.13.3",
     "react": "^16.6.0",
     "react-dom": "^16.6.0"
