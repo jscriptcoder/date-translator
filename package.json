@@ -2,14 +2,13 @@
   "name": "date-translator",
   "version": "1.0.0",
   "description": "Using Neural Machine Translation with Attention to build a date translator",
-  "main": "src/jsx/index.jsx",
+  "main": "lib/index.js",
   "scripts": {
     "build": "webpack --env.production",
     "copy:model": "cp -R tfjsmodel example",
     "build:example": "webpack",
     "preexample": "npm run copy:model",
-    "example": "npm run build:example",
-    "postexample": ""
+    "example": "webpack-dev-server"
   },
   "repository": {
     "type": "git",
@@ -39,7 +38,8 @@
     "style-loader": "^0.23.1",
     "webpack": "^4.23.1",
     "webpack-cli": "^3.1.2",
-    "webpack-dev-server": "^3.1.10"
+    "webpack-dev-server": "^3.1.10",
+    "webpack-node-externals": "^1.7.2"
   },
   "dependencies": {
     "@babel/polyfill": "^7.0.0",
