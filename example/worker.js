@@ -24372,37 +24372,48 @@ function str2int(str, vocab) {
 
   let intArr = str
     .split('')
-    .map(char => humanVocab[char] || humanVocab['<unk>'])
+    .map(char => {
+      let idx = humanVocab[char]
+      if (typeof idx === 'undefined') {
+        idx = humanVocab['<unk>']
+      }
+      return idx
+    })
 
   if (str.length < maxLen) {
     intArr = intArr.concat(
-      new Array(length - str.length).fill(humanVocab['<pad>'])
+      new Array(maxLen - str.length).fill(humanVocab['<pad>'])
     )
   }
 
   return intArr
 }
 
-function translate(value, onTranslate) {
-  if (value && value.length >= lenMachineVocab) {
+async function translate(value, onTranslate) {
+  if (value && value.length >= 8) {
 
-    const source = str2int(value, maxLen)
-    const onehotSource = _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["oneHot"](_tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["tensor1d"](source, 'int32'), numClasses)
-    const reshapedSource = onehotSource.reshape([numSamples].concat(onehotSource.shape))
+    return new Promise(resolve => {
+      const source = str2int(value, maxLen)
+      const onehotSource = _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["oneHot"](_tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["tensor1d"](source, 'int32'), numClasses)
+      const reshapedSource = onehotSource.reshape([numSamples].concat(onehotSource.shape))
 
-    const prediction = model.predict([reshapedSource, s0, c0])
+      const prediction = model.predict([reshapedSource, s0, c0])
 
-    const date = prediction.reduce((acc, pred) => {
-      const pIdx = pred
-        .reshape([lenMachineVocab])
-        .argMax()
-        .get()
+      const date = prediction.reduce((acc, pred) => {
+        const pIdx = pred
+          .reshape([lenMachineVocab])
+          .argMax()
+          .get()
 
-      return acc + invMachineVocab[pIdx]
-    }, '')
+        return acc + invMachineVocab[pIdx]
+      }, '')
 
-    onTranslate(date)
+      resolve(date)
+    })
+
   }
+
+  return Promise.resolve('')
 }
 
 async function loadModel() {
@@ -24411,14 +24422,12 @@ async function loadModel() {
   postMessage({ loading: false })
 }
 
-onmessage = event => {
+onmessage = async event => {
   const value = event.data
 
   postMessage({ translating: true })
-
-  translate(value, model, date => {
-    postMessage({ date })
-  })
+  const date = await translate(value)
+  postMessage({ date })
 }
 
 loadModel()

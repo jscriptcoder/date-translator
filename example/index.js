@@ -9959,21 +9959,28 @@ __webpack_require__.r(__webpack_exports__);
 
 async function DateTranslator(config) {
 
-  const { input, onTranslate } = config
+  const {
+    input,
+    beforeModelLoad,
+    onModelLoad,
+    beforeTranslate,
+    onTranslate,
+  } = config
 
   if (input) {
 
     const worker = new Worker('./worker.js')
 
-    worker.onmessage = message => {
-      if (message.loading) {
-        console.log('Loading model')
-      } else if (message.translating) {
-        console.log('Translating human date')
-      } else if (message.date) {
-        console.log(`Machine date: ${message.date}`)
+    worker.onmessage = event => {
+      const { data } = event
+      if (data.loading) {
+        beforeModelLoad()
+      } else if (data.translating) {
+        beforeTranslate(input.value)
+      } else if (data.date) {
+        onTranslate(data.date)
       } else {
-        console.log('Model loaded')
+        onModelLoad()
       }
     }
 
@@ -10042,7 +10049,18 @@ const display = document.getElementById('machine-date-display')
 
 Object(_DateTranslator__WEBPACK_IMPORTED_MODULE_2__["default"])({
   input,
-  onTranslate: machineDate => display.textContent = machineDate
+  beforeModelLoad() {
+    display.textContent = 'Loading model'
+  },
+  onModelLoad() {
+    display.textContent = 'Model loaded'
+  },
+  beforeTranslate() {
+    display.textContent = 'Translating...'
+  },
+  onTranslate(date) {
+    display.textContent = date
+  }
 })
 
 
