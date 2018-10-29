@@ -8,10 +8,13 @@ module.exports = env => {
 
   return {
     mode: prod ? 'production' : 'development',
-    entry: `./src/${prod ? 'DateTranslator.js' : 'example.js'}`,
+    entry: {
+      index: `./src/${prod ? 'DateTranslator.js' : 'example.js'}`,
+      worker: './src/worker.js'
+    },
     output: {
       path: path.resolve(__dirname, prod ? 'lib/' : 'example/'),
-      filename: 'index.js'
+      filename: '[name].js',
     },
     externals: prod ? [ nodeExternals() ] : {},
     module: {
@@ -34,11 +37,9 @@ module.exports = env => {
         }
       ]
     },
-    plugins: [ new webpack.HotModuleReplacementPlugin() ],
     devServer: {
       contentBase: path.join(__dirname, "example/"),
       port: 5000,
-      hotOnly: true,
       open: true,
     },
     devtool: prod ? false : 'source-map',

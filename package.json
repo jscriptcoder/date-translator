@@ -4,10 +4,10 @@
   "description": "Using Neural Machine Translation with Attention to build a date translator",
   "main": "lib/index.js",
   "scripts": {
+    "prebuild": "cp -R tfjsmodel lib",
     "build": "webpack --env.production",
-    "copy:model": "cp -R tfjsmodel example",
     "build:example": "webpack",
-    "preexample": "npm run copy:model",
+    "preexample": "cp -R tfjsmodel example",
     "example": "webpack-dev-server"
   },
   "repository": {
