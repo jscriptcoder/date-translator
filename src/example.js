@@ -8,5 +8,16 @@ const display = document.getElementById('machine-date-display')
 
 DateTranslator({
   input,
-  onTranslate: machineDate => display.textContent = machineDate
+  beforeModelLoad() {
+    display.textContent = 'Loading model'
+  },
+  onModelLoad() {
+    display.textContent = 'Model loaded'
+  },
+  beforeTranslate() {
+    display.textContent = 'Translating...'
+  },
+  onTranslate(date) {
+    display.textContent = date
+  }
 })

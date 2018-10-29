@@ -3,7 +3,13 @@ import debounce from 'debounce'
 
 export default async function DateTranslator(config) {
 
-  const { input, onTranslate } = config
+  const {
+    input,
+    beforeModelLoad,
+    onModelLoad,
+    beforeTranslate,
+    onTranslate,
+  } = config
 
   if (input) {
 
@@ -12,13 +18,13 @@ export default async function DateTranslator(config) {
     worker.onmessage = event => {
       const { data } = event
       if (data.loading) {
-        console.log('Loading model')
+        beforeModelLoad()
       } else if (data.translating) {
-        console.log('Translating human date')
+        beforeTranslate(input.value)
       } else if (data.date) {
-        console.log(`Machine date: ${data.date}`)
+        onTranslate(data.date)
       } else {
-        console.log('Model loaded')
+        onModelLoad()
       }
     }
 
