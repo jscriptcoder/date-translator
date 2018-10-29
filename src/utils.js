@@ -1,3 +1,12 @@
+import { zeros } from '@tensorflow/tfjs'
+
+const tx = 30
+const m = 1
+const ns = 64
+
+export const s0 = zeros([m, ns], 'int32')
+export const c0 = zeros([m, ns], 'int32')
+
 export const humanVocab = {
   ' ': 0,
   '-': 1,
@@ -67,6 +76,9 @@ export const invMachineVocab = {
   10: '9'
 }
 
+export const numClasses = Object.keys(humanVocab).length
+export const lenMachineVocab = Object.keys(invMachineVocab).length
+
 export function str2int(str, length, vocab) {
   str = str
     .toLowerCase()
@@ -88,3 +100,5 @@ export function str2int(str, length, vocab) {
 
   return intArr
 }
+
+export function noop() {}
