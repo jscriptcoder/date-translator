@@ -1,11 +1,12 @@
 import { zeros } from '@tensorflow/tfjs'
 
-const tx = 30
-const m = 1
+export const maxLen = 30
+export const numSamples = 1
+
 const ns = 64
 
-export const s0 = zeros([m, ns], 'int32')
-export const c0 = zeros([m, ns], 'int32')
+export const s0 = zeros([numSamples, ns], 'int32')
+export const c0 = zeros([numSamples, ns], 'int32')
 
 export const humanVocab = {
   ' ': 0,

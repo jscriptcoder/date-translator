@@ -8,7 +8,5 @@ const display = document.getElementById('machine-date-display')
 
 DateTranslator({
   input,
-  onTranslate(machineDate) {
-    display.textContent = machineDate
-  }
+  onTranslate: machineDate => display.textContent = machineDate
 })

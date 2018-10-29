@@ -3,19 +3,22 @@ import * as tf from '@tensorflow/tfjs'
 import debounce from 'debounce'
 
 import {
+  maxLen,
+  numSamples,
   s0, c0,
   humanVocab,
   invMachineVocab,
   numClasses,
   lenMachineVocab,
+  str2int,
 } from './utils'
 
 function translate(value, model, onTranslate = noop) {
   if (value && value.length >= lenMachineVocab) {
 
-    const source = str2int(value, tx)
+    const source = str2int(value, maxLen)
     const onehotSource = tf.oneHot(tf.tensor1d(source, 'int32'), numClasses)
-    const reshapedSource = onehotSource.reshape([m].concat(onehotSource.shape))
+    const reshapedSource = onehotSource.reshape([numSamples].concat(onehotSource.shape))
 
     const prediction = model.predict([reshapedSource, s0, c0])
 
@@ -40,10 +43,12 @@ export default async function DateTranslator(config) {
 
     const model = await tf.loadModel('./tfjsmodel/model.json')
 
-    input.addEventListener('input', (event) => {
-      const { value } = value
+    const onInput = debounce(event => {
+      const { value } = event.target
       translate(value, model, onTranslate)
-    })
+    }, 500)
+
+    input.addEventListener('input', onInput)
 
   }
 }
