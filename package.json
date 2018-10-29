@@ -7,6 +7,7 @@
     "prebuild": "cp -R tfjsmodel lib",
     "build": "webpack --env.production",
     "build:example": "webpack",
+    "build:all": "npm-run-all build build:example",
     "preexample": "cp -R tfjsmodel example",
     "example": "webpack-dev-server"
   },

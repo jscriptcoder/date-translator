@@ -9,10 +9,11 @@ const display = document.getElementById('machine-date-display')
 DateTranslator({
   input,
   beforeModelLoad() {
-    display.textContent = 'Loading model'
+    display.textContent = 'Loading model...'
   },
   onModelLoad() {
-    display.textContent = 'Model loaded'
+    display.textContent = 'Ready to translate...'
+    input.focus()
   },
   beforeTranslate() {
     display.textContent = 'Translating...'

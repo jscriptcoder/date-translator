@@ -8487,7 +8487,7 @@ exports = module.exports = __webpack_require__(/*! ../node_modules/css-loader/li
 
 
 // module
-exports.push([module.i, "* { box-sizing: border-box; }\n\nhtml, body {\n  margin: 0;\n  padding: 0;\n  height: 100%;\n}\n", ""]);
+exports.push([module.i, "* { box-sizing: border-box; }\n\nhtml, body {\n  margin: 0;\n  padding: 0;\n  height: 100%;\n}\n\nbody {\n  background-color: #121;\n  font-family: monospace;\n  font-size: 12px;\n  color: #393;\n  padding: 5rem\n}\n\n.container {\n  display: flex;\n  flex-direction: column;\n\n}\n\n#machine-date-display {\n  font-size: 2rem;\n  border: 4px solid #393;\n  padding: 5rem;\n  text-align: center;\n}\n\n#input-translator {\n  background-color: #121;\n  border: 2px solid #393;\n  color: grey;\n  padding: 1rem;\n  font-size: 1.5rem;\n  width: 20rem;\n  outline: none;\n  position: absolute;\n  top: 16rem;\n  left: 10rem;\n}\n", ""]);
 
 // exports
 
@@ -10050,10 +10050,11 @@ const display = document.getElementById('machine-date-display')
 Object(_DateTranslator__WEBPACK_IMPORTED_MODULE_2__["default"])({
   input,
   beforeModelLoad() {
-    display.textContent = 'Loading model'
+    display.textContent = 'Loading model...'
   },
   onModelLoad() {
-    display.textContent = 'Model loaded'
+    display.textContent = 'Ready to translate...'
+    input.focus()
   },
   beforeTranslate() {
     display.textContent = 'Translating...'
