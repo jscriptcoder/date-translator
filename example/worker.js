@@ -81,7 +81,7 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = "./src/worker.js");
+/******/ 	return __webpack_require__(__webpack_require__.s = "./src/DateTranslator/worker.js");
 /******/ })
 /************************************************************************/
 /******/ ({
@@ -24268,26 +24268,35 @@ module.exports = function(module) {
 
 /***/ }),
 
-/***/ "./src/worker.js":
-/*!***********************!*\
-  !*** ./src/worker.js ***!
-  \***********************/
-/*! no exports provided */
+/***/ "./src/DateTranslator/utils.js":
+/*!*************************************!*\
+  !*** ./src/DateTranslator/utils.js ***!
+  \*************************************/
+/*! exports provided: maxLen, numSamples, ns, s0, c0, humanVocab, machineVocab, invMachineVocab, numClasses, lenMachineVocab, str2int */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "maxLen", function() { return maxLen; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "numSamples", function() { return numSamples; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ns", function() { return ns; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "s0", function() { return s0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "c0", function() { return c0; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "humanVocab", function() { return humanVocab; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "machineVocab", function() { return machineVocab; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "invMachineVocab", function() { return invMachineVocab; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "numClasses", function() { return numClasses; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "lenMachineVocab", function() { return lenMachineVocab; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "str2int", function() { return str2int; });
 /* harmony import */ var _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @tensorflow/tfjs */ "./node_modules/@tensorflow/tfjs/dist/tf.esm.js");
 
-
-let model = null
 
 const maxLen = 30
 const numSamples = 1
 const ns = 64
 
-const s0 = _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["zeros"]([numSamples, ns], 'int32')
-const c0 = _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["zeros"]([numSamples, ns], 'int32')
+const s0 = Object(_tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["zeros"])([numSamples, ns], 'int32')
+const c0 = Object(_tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["zeros"])([numSamples, ns], 'int32')
 
 const humanVocab = {
   ' ': 0,
@@ -24389,23 +24398,42 @@ function str2int(str, vocab) {
   return intArr
 }
 
+
+/***/ }),
+
+/***/ "./src/DateTranslator/worker.js":
+/*!**************************************!*\
+  !*** ./src/DateTranslator/worker.js ***!
+  \**************************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @tensorflow/tfjs */ "./node_modules/@tensorflow/tfjs/dist/tf.esm.js");
+/* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./utils */ "./src/DateTranslator/utils.js");
+
+
+
+let model = null
+
 async function translate(value, onTranslate) {
   if (value && value.length >= 8) {
 
     return new Promise(resolve => {
-      const source = str2int(value, maxLen)
-      const onehotSource = _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["oneHot"](_tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["tensor1d"](source, 'int32'), numClasses)
-      const reshapedSource = onehotSource.reshape([numSamples].concat(onehotSource.shape))
+      const source = Object(_utils__WEBPACK_IMPORTED_MODULE_1__["str2int"])(value, _utils__WEBPACK_IMPORTED_MODULE_1__["maxLen"])
+      const onehotSource = _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["oneHot"](_tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["tensor1d"](source, 'int32'), _utils__WEBPACK_IMPORTED_MODULE_1__["numClasses"])
+      const reshapedSource = onehotSource.reshape([_utils__WEBPACK_IMPORTED_MODULE_1__["numSamples"]].concat(onehotSource.shape))
 
-      const prediction = model.predict([reshapedSource, s0, c0])
+      const prediction = model.predict([reshapedSource, _utils__WEBPACK_IMPORTED_MODULE_1__["s0"], _utils__WEBPACK_IMPORTED_MODULE_1__["c0"]])
 
       const date = prediction.reduce((acc, pred) => {
         const pIdx = pred
-          .reshape([lenMachineVocab])
+          .reshape([_utils__WEBPACK_IMPORTED_MODULE_1__["lenMachineVocab"]])
           .argMax()
           .get()
 
-        return acc + invMachineVocab[pIdx]
+        return acc + _utils__WEBPACK_IMPORTED_MODULE_1__["invMachineVocab"][pIdx]
       }, '')
 
       resolve(date)

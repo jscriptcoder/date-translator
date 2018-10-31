@@ -11,7 +11,7 @@ DateTranslator({
   beforeModelLoad() {
     display.textContent = 'Loading model...'
   },
-  onModelLoad() {
+  onReady() {
     display.textContent = 'Ready to translate...'
     input.focus()
   },

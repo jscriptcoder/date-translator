@@ -9,8 +9,8 @@ module.exports = env => {
   return {
     mode: prod ? 'production' : 'development',
     entry: {
-      index: `./src/${prod ? 'DateTranslator.js' : 'example.js'}`,
-      worker: './src/worker.js'
+      index: `./src/${prod ? 'DateTranslator/index.js' : 'example.js'}`,
+      worker: './src/DateTranslator/worker.js'
     },
     output: {
       path: path.resolve(__dirname, prod ? 'lib/' : 'example/'),

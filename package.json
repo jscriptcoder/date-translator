@@ -4,12 +4,14 @@
   "description": "Using Neural Machine Translation with Attention to build a date translator",
   "main": "lib/index.js",
   "scripts": {
+    "convert-model": "tensorflowjs_converter --input_format keras jupyter/dates_model.h5 tfjsmodel/",
     "prebuild": "cp -R tfjsmodel lib",
     "build": "webpack --env.production",
+    "prebuild:example": "cp -R tfjsmodel example",
     "build:example": "webpack",
     "build:all": "npm-run-all build build:example",
-    "preexample": "cp -R tfjsmodel example",
-    "example": "webpack-dev-server"
+    "example": "webpack-dev-server",
+    "postinstall": "pip install tensorflowjs"
   },
   "repository": {
     "type": "git",

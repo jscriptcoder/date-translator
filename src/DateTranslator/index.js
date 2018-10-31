@@ -6,7 +6,7 @@ export default async function DateTranslator(config) {
   const {
     input,
     beforeModelLoad,
-    onModelLoad,
+    onReady,
     beforeTranslate,
     onTranslate,
   } = config
@@ -24,7 +24,7 @@ export default async function DateTranslator(config) {
       } else if (data.date) {
         onTranslate(data.date)
       } else {
-        onModelLoad()
+        onReady()
       }
     }
 

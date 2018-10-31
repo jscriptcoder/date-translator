@@ -9940,10 +9940,10 @@ module.exports = g;
 
 /***/ }),
 
-/***/ "./src/DateTranslator.js":
-/*!*******************************!*\
-  !*** ./src/DateTranslator.js ***!
-  \*******************************/
+/***/ "./src/DateTranslator/index.js":
+/*!*************************************!*\
+  !*** ./src/DateTranslator/index.js ***!
+  \*************************************/
 /*! exports provided: default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -9962,7 +9962,7 @@ async function DateTranslator(config) {
   const {
     input,
     beforeModelLoad,
-    onModelLoad,
+    onReady,
     beforeTranslate,
     onTranslate,
   } = config
@@ -9980,7 +9980,7 @@ async function DateTranslator(config) {
       } else if (data.date) {
         onTranslate(data.date)
       } else {
-        onModelLoad()
+        onReady()
       }
     }
 
@@ -10038,7 +10038,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _example_css__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_example_css__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var _babel_polyfill__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @babel/polyfill */ "./node_modules/@babel/polyfill/lib/index.js");
 /* harmony import */ var _babel_polyfill__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_babel_polyfill__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var _DateTranslator__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./DateTranslator */ "./src/DateTranslator.js");
+/* harmony import */ var _DateTranslator__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./DateTranslator */ "./src/DateTranslator/index.js");
 
 
 
@@ -10052,7 +10052,7 @@ Object(_DateTranslator__WEBPACK_IMPORTED_MODULE_2__["default"])({
   beforeModelLoad() {
     display.textContent = 'Loading model...'
   },
-  onModelLoad() {
+  onReady() {
     display.textContent = 'Ready to translate...'
     input.focus()
   },
