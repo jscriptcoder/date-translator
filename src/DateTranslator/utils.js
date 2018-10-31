@@ -10,42 +10,41 @@ export const c0 = zeros([numSamples, ns], 'int32')
 export const humanVocab = {
   ' ': 0,
   '-': 1,
-  '.': 2,
-  '/': 3,
-  '0': 4,
-  '1': 5,
-  '2': 6,
-  '3': 7,
-  '4': 8,
-  '5': 9,
-  '6': 10,
-  '7': 11,
-  '8': 12,
-  '9': 13,
-  'a': 14,
-  'b': 15,
-  'c': 16,
-  'd': 17,
-  'e': 18,
-  'f': 19,
-  'g': 20,
-  'h': 21,
-  'i': 22,
-  'j': 23,
-  'l': 24,
-  'm': 25,
-  'n': 26,
-  'o': 27,
-  'p': 28,
-  'r': 29,
-  's': 30,
-  't': 31,
-  'u': 32,
-  'v': 33,
-  'w': 34,
-  'y': 35,
-  '<unk>': 36,
-  '<pad>': 37
+  '/': 2,
+  '0': 3,
+  '1': 4,
+  '2': 5,
+  '3': 6,
+  '4': 7,
+  '5': 8,
+  '6': 9,
+  '7': 10,
+  '8': 11,
+  '9': 12,
+  'a': 13,
+  'b': 14,
+  'c': 15,
+  'd': 16,
+  'e': 17,
+  'f': 18,
+  'g': 19,
+  'h': 20,
+  'i': 21,
+  'j': 22,
+  'l': 23,
+  'm': 24,
+  'n': 25,
+  'o': 26,
+  'p': 27,
+  'r': 28,
+  's': 29,
+  't': 30,
+  'u': 31,
+  'v': 32,
+  'w': 33,
+  'y': 34,
+  '<unk>': 35,
+  '<pad>': 36
 }
 
 export const machineVocab = {
@@ -82,7 +81,12 @@ export const lenMachineVocab = Object.keys(invMachineVocab).length
 export function str2int(str) {
   str = str
     .toLowerCase()
-    .replace(',','')
+    .replace(',','') // removes comas
+    .replace('/', '-') // removes slashes
+    .replace(' of ', ' ') // removes preposition
+    .replace(/([0-9])(st|nd|rd|th)/, '$1') // removes ordinals
+
+  console.log(`After cleaning: ${str}`)
 
   if (str.length > maxLen) {
     str = str.slice(0, maxLen)
