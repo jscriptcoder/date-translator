@@ -1,7 +1,6 @@
 import * as tf from '@tensorflow/tfjs'
 import {
   s0, c0,
-  maxLen,
   str2int,
   numClasses,
   numSamples,
@@ -15,7 +14,7 @@ async function translate(value, onTranslate) {
   if (value && value.length >= 8) {
 
     return new Promise(resolve => {
-      const source = str2int(value, maxLen)
+      const source = str2int(value)
       const onehotSource = tf.oneHot(tf.tensor1d(source, 'int32'), numClasses)
       const reshapedSource = onehotSource.reshape([numSamples].concat(onehotSource.shape))
 

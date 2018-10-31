@@ -79,7 +79,7 @@ export const invMachineVocab = {
 export const numClasses = Object.keys(humanVocab).length
 export const lenMachineVocab = Object.keys(invMachineVocab).length
 
-export function str2int(str, vocab) {
+export function str2int(str) {
   str = str
     .toLowerCase()
     .replace(',','')

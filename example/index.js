@@ -8487,7 +8487,7 @@ exports = module.exports = __webpack_require__(/*! ../node_modules/css-loader/li
 
 
 // module
-exports.push([module.i, "* { box-sizing: border-box; }\n\nhtml, body {\n  margin: 0;\n  padding: 0;\n  height: 100%;\n}\n\nbody {\n  background-color: #121;\n  font-family: monospace;\n  font-size: 12px;\n  color: #393;\n  padding: 5rem\n}\n\n.container {\n  display: flex;\n  flex-direction: column;\n\n}\n\n#machine-date-display {\n  font-size: 2rem;\n  border: 4px solid #393;\n  padding: 5rem;\n  text-align: center;\n}\n\n#input-translator {\n  background-color: #121;\n  border: 2px solid #393;\n  color: grey;\n  padding: 1rem;\n  font-size: 1.5rem;\n  width: 20rem;\n  outline: none;\n  position: absolute;\n  top: 16rem;\n  left: 10rem;\n}\n", ""]);
+exports.push([module.i, "* { box-sizing: border-box; }\n\nhtml, body {\n  margin: 0;\n  padding: 0;\n  height: 100%;\n}\n\nbody {\n  background-color: #121;\n  font-family: monospace;\n  font-size: 8px;\n  color: #393;\n}\n\n.container {\n  display: flex;\n  flex-direction: column;\n  position: relative;\n}\n\n#machine-date-display {\n  font-size: 2em;\n  border: 0.2em solid #393;\n  padding: 2em;\n  text-align: center;\n}\n\n#input-translator {\n  background-color: #121;\n  border: 0.1em solid #393;\n  color: grey;\n  padding: 0.5em;\n  font-size: 1.5em;\n  width: 14em;\n  outline: none;\n  position: absolute;\n  bottom: -1em;\n  left: 2em;\n}\n\n@media (min-width: 576px) {\n  body {\n    font-size: 12px;\n    padding: 2em;\n  }\n}\n\n@media (min-width: 768px) {\n  body {\n    font-size: 14px;\n    padding: 2em;\n  }\n}\n\n@media (min-width: 992px) {\n  body {\n    font-size: 16px;\n    padding: 4em;\n  }\n}\n", ""]);
 
 // exports
 
@@ -9957,7 +9957,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-async function DateTranslator(config) {
+function DateTranslator(config) {
 
   const {
     input,

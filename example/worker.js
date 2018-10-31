@@ -24370,7 +24370,7 @@ const invMachineVocab = {
 const numClasses = Object.keys(humanVocab).length
 const lenMachineVocab = Object.keys(invMachineVocab).length
 
-function str2int(str, vocab) {
+function str2int(str) {
   str = str
     .toLowerCase()
     .replace(',','')
@@ -24421,7 +24421,7 @@ async function translate(value, onTranslate) {
   if (value && value.length >= 8) {
 
     return new Promise(resolve => {
-      const source = Object(_utils__WEBPACK_IMPORTED_MODULE_1__["str2int"])(value, _utils__WEBPACK_IMPORTED_MODULE_1__["maxLen"])
+      const source = Object(_utils__WEBPACK_IMPORTED_MODULE_1__["str2int"])(value)
       const onehotSource = _tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["oneHot"](_tensorflow_tfjs__WEBPACK_IMPORTED_MODULE_0__["tensor1d"](source, 'int32'), _utils__WEBPACK_IMPORTED_MODULE_1__["numClasses"])
       const reshapedSource = onehotSource.reshape([_utils__WEBPACK_IMPORTED_MODULE_1__["numSamples"]].concat(onehotSource.shape))
 

@@ -1,7 +1,7 @@
 import '@babel/polyfill'
 import debounce from 'debounce'
 
-export default async function DateTranslator(config) {
+export default function DateTranslator(config) {
 
   const {
     input,
