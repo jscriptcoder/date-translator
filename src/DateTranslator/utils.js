@@ -81,7 +81,7 @@ export function str2int(str) {
   str = str
     .toLowerCase()
     .replace(/,/g,'')
-    .replace(/\-|\./g, '-')
+    .replace(/\-|\./g, '/')
     .replace(' of ', ' ')
     .replace(/([0-9])(st|nd|rd|th)/g, '$1')
 

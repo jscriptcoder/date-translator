@@ -24372,7 +24372,7 @@ function str2int(str) {
   str = str
     .toLowerCase()
     .replace(/,/g,'')
-    .replace(/\-|\./g, '-')
+    .replace(/\-|\./g, '/')
     .replace(' of ', ' ')
     .replace(/([0-9])(st|nd|rd|th)/g, '$1')
 
@@ -24421,7 +24421,7 @@ __webpack_require__.r(__webpack_exports__);
 let model = null
 
 async function translate(value, onTranslate) {
-  if (value && value.length >= 8) {
+  if (value && value.length >= 6) {
 
     return new Promise(resolve => {
       const source = Object(_utils__WEBPACK_IMPORTED_MODULE_1__["str2int"])(value)

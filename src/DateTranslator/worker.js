@@ -11,7 +11,7 @@ import {
 let model = null
 
 async function translate(value, onTranslate) {
-  if (value && value.length >= 8) {
+  if (value && value.length >= 6) {
 
     return new Promise(resolve => {
       const source = str2int(value)
