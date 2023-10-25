@@ -6,3 +6,5 @@ This project is a proof of concept about How to build Frontend Components powere
 See [Jupyter notebook (html format)](https://jscriptcoder.github.io/date-translator/Machine%20Translation%20with%20Attention%20model.html) for information about this project and how the model has been built and trained.
 
 [Date Translator component demo](https://jscriptcoder.github.io/date-translator/)
+
+<!-- sort 1 -->
